@@ -1,4 +1,8 @@
 {
   "name": "not_pixel_s2_info",
-  "packageManager": "yarn@4.6.0"
+  "type": "module",
+  "packageManager": "yarn@4.6.0",
+  "dependencies": {
+    "telegraf": "^4.16.3"
+  }
 }
