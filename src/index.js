@@ -48,7 +48,7 @@ async function startDataSync() {
         now.getMilliseconds();
     setTimeout(() => {
         updatePrevious();
-        setInterval(updatePrevious, 60 * 60_000); 
+        setInterval(updatePrevious, 60 * 60_000);
     }, msToNextHour);
 }
 
@@ -61,8 +61,9 @@ bot.command('pixels', (ctx) => {
         const curr = current[key];
         const prev = previous[key] ?? 0;
         const delta = curr - prev;
-        const sign = delta >= 0 ? '+' : '';
-        return `${key} $PX => ${curr} pcs. (${sign}${delta} pcs/hour)`;
+        const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
+        const deltaValue = Math.abs(delta);
+        return `${key} $PX => ${curr} pcs. (${sign}${deltaValue} pcs/hour)`;
     });
 
     ctx.reply(lines.join('\n'));
