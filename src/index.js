@@ -1,8 +1,32 @@
 import { Telegraf } from 'telegraf'
 import rateLimit from 'telegraf-ratelimit'
+import DB from 'better-sqlite3'
 
+const db = new DB('db.sqlite');
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const API_URL = 'https://notpixel.org/api/v1/battle-canvas/pixels/filter-info';
+
+const insertRecord = (record) => {
+    const ts = Math.floor(Date.now() / 1000);
+    const insert = db.prepare('INSERT INTO records (ts, data) VALUES (?, ?)');
+    insert.run(ts, JSON.stringify(record));
+};
+
+
+const getRecordsBetweenDates = (date1ts, date2ts) => {
+    const rows = db.prepare('SELECT data FROM records WHERE ts BETWEEN ? AND ?').all(date1ts, date2ts)
+    console.log(rows);
+    return rows;
+}
+
+const saveCurrentSnapshot = () => {
+    const ts = Math.floor(Date.now() / 1000);
+    insertRecord(current);
+    previous = { ...current };
+    console.log(`[${new Date().toISOString()}] Snapshot saved at ts=${ts}`);
+};
+
+
 
 let current = {};
 let previous = {};
@@ -47,8 +71,8 @@ async function startDataSync() {
         now.getSeconds() * 1000 -
         now.getMilliseconds();
     setTimeout(() => {
-        updatePrevious();
-        setInterval(updatePrevious, 60 * 60_000);
+        saveCurrentSnapshot();
+        setInterval(saveCurrentSnapshot, 60 * 60_000);
     }, msToNextHour);
 }
 
@@ -68,6 +92,17 @@ bot.command('pixels', (ctx) => {
 
     ctx.reply(lines.join('\n'));
 });
+
+bot.command('stats', (ctx) => {
+    const now = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+
+    const data = getRecordsBetweenDates(yesterday.getTime() / 1000, now.getTime() / 1000);
+    console.log(data);
+
+    ctx.reply("OK")
+})
 
 bot.catch(console.error);
 
