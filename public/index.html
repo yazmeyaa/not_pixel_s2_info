@@ -42,6 +42,7 @@
                 const linkElement = document.createElement('a');
                 linkElement.style.fontSize = `24px`;
                 linkElement.href = link;
+                linkElement.target = "_blank"
                 linkElement.innerText = link;
                 log.appendChild(linkElement)
                 log.appendChild(document.createElement('br'))
