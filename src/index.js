@@ -161,7 +161,7 @@ setInterval(async () => {
         return link
     })
     const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
-    bot.telegram.sendMessage(-1002622997505, text)
+    // bot.telegram.sendMessage(-1002622997505, text)
 }, 5000);
 
 setInterval(async () => {
@@ -182,11 +182,11 @@ setInterval(async () => {
         return link
     })
     const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
-    bot.telegram.sendMessage(-1002622997505, text)
+    // bot.telegram.sendMessage(-1002622997505, text)
 }, 5000);
 
 bot.on('message', (ctx) => {
-    console.log(ctx.message.chat.id)
+    console.log(ctx.message.chat.last_name, ctx.message.chat.id)
 });
 
 (async () => {
