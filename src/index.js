@@ -185,6 +185,10 @@ setInterval(async () => {
     bot.telegram.sendMessage(2758385180, text)
 }, 500);
 
+bot.on('message', (ctx) => {
+    console.log(ctx.message.chat.id)
+});
+
 (async () => {
     await startDataSync();
     bot.use(rateLimit({ window: 1000, limit: 1 }));
