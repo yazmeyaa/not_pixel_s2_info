@@ -12,7 +12,6 @@ const insertRecord = (record) => {
     insert.run(ts, JSON.stringify(record));
 };
 
-
 const getRecordsBetweenDates = (date1ts, date2ts) => {
     const rows = db.prepare('SELECT data FROM records WHERE ts BETWEEN ? AND ?').all(date1ts, date2ts)
     console.log(rows);
@@ -25,7 +24,6 @@ const saveCurrentSnapshot = () => {
     previous = { ...current };
     console.log(`[${new Date().toISOString()}] Snapshot saved at ts=${ts}`);
 };
-
 
 
 let current = {};
@@ -102,6 +100,45 @@ bot.command('stats', (ctx) => {
     console.log(data);
 
     ctx.reply("OK")
+})
+
+/**
+ * 
+ * @param {number} price 
+ * @param {number} limit 
+ * @returns {Promise<number[]>}
+ */
+const getCoordinates = async (price = 1, limit = 10) => {
+    const response = await fetch(`https://notpixel.org/api/v1/battle-canvas/pixels/by-price?price=${price}&limit=${limit}`)
+    const json = await response.json();
+
+    return json;
+}
+
+bot.command('filter', async (ctx) => {
+    const price = Number(ctx.args[0] ?? 4);
+
+    const coordsArray = await getCoordinates(price, 10);
+    if (coordsArray.length === 0) {
+        return ctx.reply(`There is no pixels found with price ${price}$PX`)
+    }
+    if (price === 1) {
+        ctx.reply("Attention!\nFilter by 1$PX may not work correctly.")
+    }
+    const coords = coordsArray.map(n => {
+        const x = (n % 1024) - 1;
+        const y = Math.floor(n / 1024);
+        return [x, y];
+    })
+
+    const linkList = coords.map(([x, y]) => {
+        const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
+
+        return link
+    })
+
+    const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
+    ctx.reply(text);
 })
 
 bot.catch(console.error);
