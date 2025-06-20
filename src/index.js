@@ -143,48 +143,6 @@ bot.command('filter', async (ctx) => {
 
 bot.catch(console.error);
 
-setInterval(async () => {
-    const price = 4;
-    const coordsArray = await getCoordinates(price, 10);
-    if (coordsArray.length === 0) {
-        return
-    }
-    const coords = coordsArray.map(n => {
-        const x = (n % 1024) - 1;
-        const y = Math.floor(n / 1024);
-        return [x, y];
-    })
-
-    const linkList = coords.map(([x, y]) => {
-        const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
-
-        return link
-    })
-    const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
-    bot.telegram.sendMessage(-1002758385180, text)
-}, 2000);
-
-setInterval(async () => {
-    const price = 8;
-    const coordsArray = await getCoordinates(price, 10);
-    if (coordsArray.length === 0) {
-        return
-    }
-    const coords = coordsArray.map(n => {
-        const x = (n % 1024) - 1;
-        const y = Math.floor(n / 1024);
-        return [x, y];
-    })
-
-    const linkList = coords.map(([x, y]) => {
-        const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
-
-        return link
-    })
-    const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
-    bot.telegram.sendMessage(-1002622997505, text)
-}, 2000);
-
 bot.on('channel_post', (ctx) => {
     console.log(ctx.chat.id)
 });
