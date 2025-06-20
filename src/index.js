@@ -162,7 +162,7 @@ setInterval(async () => {
     })
     const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
     bot.telegram.sendMessage(-1002622997505, text)
-}, 1500);
+}, 5000);
 
 setInterval(async () => {
     const price = 8;
@@ -183,7 +183,7 @@ setInterval(async () => {
     })
     const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
     bot.telegram.sendMessage(-1002622997505, text)
-}, 1500);
+}, 5000);
 
 bot.on('message', (ctx) => {
     console.log(ctx.message.chat.id)
