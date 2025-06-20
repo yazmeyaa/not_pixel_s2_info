@@ -33,6 +33,9 @@
 
         socket.on('got_pixels', (data) => {
             log.innerHTML = ''
+            if(data.links.length === 0) {
+                log.innerHTML = `<strong>No links yet</strong>`
+            }
             const { links } = data;
             for (const link of links) {
                 const linkElement = document.createElement('a');

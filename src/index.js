@@ -165,25 +165,23 @@ const hearthBeatGetPixel = (delay, price = 4) => {
     setTimeout(async () => {
         const coordsArray = await getCoordinates(price, 10);
         console.clear();
-        if (coordsArray.length > 0) {
-            const coords = coordsArray.map(n => {
-                const x = (n % 1024) - 1;
-                const y = Math.floor(n / 1024);
-                return [x, y];
-            })
+        const coords = coordsArray.map(n => {
+            const x = (n % 1024) - 1;
+            const y = Math.floor(n / 1024);
+            return [x, y];
+        })
 
-            const linkList = coords.map(([x, y]) => {
-                const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
+        const linkList = coords.map(([x, y]) => {
+            const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
 
-                return link
-            })
+            return link
+        })
 
-            console.log(linkList)
+        console.log(linkList)
 
-            io.emit('got_pixels', {
-                links: linkList
-            });
-        }
+        io.emit('got_pixels', {
+            links: linkList
+        });
 
         hearthBeatGetPixel(delay);
     }, delay)
