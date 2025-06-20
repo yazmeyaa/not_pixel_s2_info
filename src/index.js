@@ -161,7 +161,7 @@ setInterval(async () => {
         return link
     })
     const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
-    // bot.telegram.sendMessage(-1002622997505, text)
+    bot.telegram.sendMessage(-1002758385180, text)
 }, 5000);
 
 setInterval(async () => {
@@ -182,12 +182,14 @@ setInterval(async () => {
         return link
     })
     const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
-    // bot.telegram.sendMessage(-1002622997505, text)
+    bot.telegram.sendMessage(-1002622997505, text)
 }, 5000);
 
 bot.on('channel_post', (ctx) => {
     console.log(ctx.chat.id)
 });
+
+bot.telegram.sendMessage(-1002622997505, "Я случайно отправлял вам сообщения. Пожалуйста, напишите мне @future_undefined")
 
 (async () => {
     await startDataSync();
