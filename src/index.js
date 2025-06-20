@@ -1,9 +1,11 @@
 import { Telegraf } from 'telegraf'
 import rateLimit from 'telegraf-ratelimit'
 import DB from 'better-sqlite3'
+import { Server } from 'socket.io'
+import express from 'express'
 
 const db = new DB('db.sqlite');
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const telegram_app = new Telegraf(process.env.BOT_TOKEN);
 const API_URL = 'https://notpixel.org/api/v1/battle-canvas/pixels/filter-info';
 
 const insertRecord = (record) => {
@@ -74,7 +76,7 @@ async function startDataSync() {
     }, msToNextHour);
 }
 
-bot.command('pixels', (ctx) => {
+telegram_app.command('pixels', (ctx) => {
     if (!Object.keys(current).length || !Object.keys(previous).length) {
         return ctx.reply('⏳ Данные еще загружаются...');
     }
@@ -91,7 +93,7 @@ bot.command('pixels', (ctx) => {
     ctx.reply(lines.join('\n'));
 });
 
-bot.command('stats', (ctx) => {
+telegram_app.command('stats', (ctx) => {
     const now = new Date();
     const yesterday = new Date();
     yesterday.setDate(now.getDate() - 1);
@@ -115,7 +117,7 @@ const getCoordinates = async (price = 1, limit = 10) => {
     return json;
 }
 
-bot.command('filter', async (ctx) => {
+telegram_app.command('filter', async (ctx) => {
     const price = Number(ctx.args[0] ?? 4);
 
     const coordsArray = await getCoordinates(price, 10);
@@ -141,15 +143,57 @@ bot.command('filter', async (ctx) => {
     ctx.reply(text);
 })
 
-bot.catch(console.error);
+telegram_app.catch(console.error);
 
-bot.on('channel_post', (ctx) => {
+telegram_app.on('channel_post', (ctx) => {
     console.log(ctx.chat.id)
 });
 
+const app = express()
+const server = app.listen(53424, () => {
+    console.log('Listening on port 53424')
+})
+const io = new Server(server, {
+    cors: {
+        origin: '*'
+    }
+})
+
+app.use(express.static('public'))
+
+const hearthBeatGetPixel = (delay, price = 4) => {
+    setTimeout(async () => {
+        const coordsArray = await getCoordinates(price, 10);
+        console.clear();
+        if (coordsArray.length > 0) {
+            const coords = coordsArray.map(n => {
+                const x = (n % 1024) - 1;
+                const y = Math.floor(n / 1024);
+                return [x, y];
+            })
+
+            const linkList = coords.map(([x, y]) => {
+                const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
+
+                return link
+            })
+
+            console.log(linkList)
+
+            io.emit('got_pixels', {
+                links: linkList
+            });
+        }
+
+        hearthBeatGetPixel(delay);
+    }, delay)
+}
+
+hearthBeatGetPixel(300, 4);
 
 (async () => {
     await startDataSync();
-    bot.use(rateLimit({ window: 1000, limit: 1 }));
-    bot.launch();
+    telegram_app.use(rateLimit({ window: 1000, limit: 1 }));
+    io.listen(19572)
+    telegram_app.launch();
 })();

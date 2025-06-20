@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Pixel Monitor</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            background: #111;
+            color: #0f0;
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #log {
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔥 Live Pixel Feed</h1>
+    <div id="log">Waiting for data...</div>
+
+    <script>
+        const socket = io();
+        const log = document.getElementById('log');
+
+        socket.on('got_pixels', (data) => {
+            log.innerHTML = ''
+            const { links } = data;
+            for (const link of links) {
+                const linkElement = document.createElement('a');
+                linkElement.style.fontSize = `24px`;
+                linkElement.href = link;
+                linkElement.innerText = link;
+                log.appendChild(linkElement)
+                log.appendChild(document.createElement('br'))
+            }
+        });
+    </script>
+</body>
+
+</html>

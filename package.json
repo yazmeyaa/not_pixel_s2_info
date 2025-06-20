@@ -4,8 +4,11 @@
   "packageManager": "yarn@4.6.0",
   "dependencies": {
     "better-sqlite3": "^11.10.0",
+    "eiows": "^8.2.0",
+    "express": "^5.1.0",
     "install": "^0.13.0",
     "npm": "^11.4.2",
+    "socket.io": "^4.8.1",
     "telegraf": "^4.16.3",
     "telegraf-ratelimit": "^2.0.0"
   }
