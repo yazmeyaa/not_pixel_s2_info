@@ -10,6 +10,8 @@
             --bg-color: #0d0d0d;
             --text-color: #00ff88;
             --link-color: #00c3ff;
+            --link-bg: #1a1a1a;
+            --border-color: #2f2f2f;
             --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
@@ -38,40 +40,34 @@
         #log {
             width: 100%;
             max-width: 800px;
-            background: #1a1a1a;
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
-            font-size: 1rem;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            transition: all 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
 
-        a {
+        .link-block {
+            background: var(--link-bg);
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            word-break: break-all;
+        }
+
+        .link-block a {
             color: var(--link-color);
             text-decoration: none;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
         }
 
-        a:hover {
+        .link-block a:hover {
             text-decoration: underline;
             color: #66e0ff;
-        }
-
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body>
     <h1>4$PX Pixels Live Feed</h1>
-    <div id="log" class="fade-in">Waiting for data...</div>
+    <div id="log">Waiting for data...</div>
 
     <script>
         const socket = io();
@@ -79,19 +75,25 @@
 
         socket.on('got_pixels', ({ links }) => {
             log.innerHTML = '';
+
             if (!links || links.length === 0) {
                 log.innerHTML = `<strong>No links yet</strong>`;
                 return;
             }
 
-            for (const link of links) {
+            const uniqueSortedLinks = Array.from(new Set(links)).sort();
+
+            for (const link of uniqueSortedLinks) {
+                const block = document.createElement('div');
+                block.className = 'link-block';
+
                 const linkElement = document.createElement('a');
                 linkElement.href = link;
                 linkElement.target = '_blank';
                 linkElement.innerText = link;
-                linkElement.classList.add('fade-in');
-                log.appendChild(linkElement);
-                log.appendChild(document.createElement('br'));
+
+                block.appendChild(linkElement);
+                log.appendChild(block);
             }
         });
     </script>
