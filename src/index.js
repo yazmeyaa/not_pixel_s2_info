@@ -189,7 +189,6 @@ bot.on('channel_post', (ctx) => {
     console.log(ctx.chat.id)
 });
 
-bot.telegram.sendMessage(-1002622997505, "Я случайно отправлял вам сообщения. Пожалуйста, напишите мне @future_undefined")
 
 (async () => {
     await startDataSync();
