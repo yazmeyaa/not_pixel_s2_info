@@ -186,7 +186,7 @@ setInterval(async () => {
 }, 5000);
 
 bot.on('message', (ctx) => {
-    console.log(ctx.message.chat.last_name, ctx.message.chat.id)
+    console.log(ctx.message.chat.last_name, ctx.message.chat.id, ctx.message.text)
 });
 
 (async () => {
