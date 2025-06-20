@@ -143,6 +143,46 @@ bot.command('filter', async (ctx) => {
 
 bot.catch(console.error);
 
+setInterval(async () => {
+    const coordsArray = await getCoordinates(4, 10);
+    if (coordsArray.length === 0) {
+        return 
+    }
+    const coords = coordsArray.map(n => {
+        const x = (n % 1024) - 1;
+        const y = Math.floor(n / 1024);
+        return [x, y];
+    })
+
+    const linkList = coords.map(([x, y]) => {
+        const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
+
+        return link
+    })
+    const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
+    bot.telegram.sendMessage(2758385180, text)
+}, 500);
+
+setInterval(async () => {
+    const coordsArray = await getCoordinates(16, 10);
+    if (coordsArray.length === 0) {
+        return 
+    }
+    const coords = coordsArray.map(n => {
+        const x = (n % 1024) - 1;
+        const y = Math.floor(n / 1024);
+        return [x, y];
+    })
+
+    const linkList = coords.map(([x, y]) => {
+        const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
+
+        return link
+    })
+    const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
+    bot.telegram.sendMessage(2758385180, text)
+}, 500);
+
 (async () => {
     await startDataSync();
     bot.use(rateLimit({ window: 1000, limit: 1 }));
