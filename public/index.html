@@ -1,54 +1,99 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
-    <title>Pixel Monitor</title>
+    <title>4$PX Pixel Monitor</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --text-color: #00ff88;
+            --link-color: #00c3ff;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: sans-serif;
+            margin: 0;
             padding: 2rem;
-            background: #111;
-            color: #0f0;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
             display: flex;
-            justify-content: center;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            text-align: center;
         }
 
         #log {
+            width: 100%;
+            max-width: 800px;
+            background: #1a1a1a;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+            font-size: 1rem;
+            line-height: 1.6;
             white-space: pre-wrap;
+            transition: all 0.3s ease-in-out;
+        }
+
+        a {
+            color: var(--link-color);
+            text-decoration: none;
+            font-size: 1.2rem;
+        }
+
+        a:hover {
+            text-decoration: underline;
+            color: #66e0ff;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
-
 <body>
     <h1>4$PX Pixels Live Feed</h1>
-    <div id="log">Waiting for data...</div>
+    <div id="log" class="fade-in">Waiting for data...</div>
 
     <script>
         const socket = io();
         const log = document.getElementById('log');
 
-        socket.on('got_pixels', (data) => {
-            log.innerHTML = ''
-            if(data.links.length === 0) {
-                log.innerHTML = `<strong>No links yet</strong>`
+        socket.on('got_pixels', ({ links }) => {
+            log.innerHTML = '';
+            if (!links || links.length === 0) {
+                log.innerHTML = `<strong>No links yet</strong>`;
+                return;
             }
-            const { links } = data;
+
             for (const link of links) {
                 const linkElement = document.createElement('a');
-                linkElement.style.fontSize = `24px`;
                 linkElement.href = link;
-                linkElement.target = "_blank"
+                linkElement.target = '_blank';
                 linkElement.innerText = link;
-                log.appendChild(linkElement)
-                log.appendChild(document.createElement('br'))
+                linkElement.classList.add('fade-in');
+                log.appendChild(linkElement);
+                log.appendChild(document.createElement('br'));
             }
         });
     </script>
 </body>
-
 </html>
