@@ -144,9 +144,10 @@ bot.command('filter', async (ctx) => {
 bot.catch(console.error);
 
 setInterval(async () => {
-    const coordsArray = await getCoordinates(4, 10);
+    const price = 4;
+    const coordsArray = await getCoordinates(price, 10);
     if (coordsArray.length === 0) {
-        return 
+        return
     }
     const coords = coordsArray.map(n => {
         const x = (n % 1024) - 1;
@@ -164,9 +165,10 @@ setInterval(async () => {
 }, 500);
 
 setInterval(async () => {
-    const coordsArray = await getCoordinates(16, 10);
+    const price = 8;
+    const coordsArray = await getCoordinates(price, 10);
     if (coordsArray.length === 0) {
-        return 
+        return
     }
     const coords = coordsArray.map(n => {
         const x = (n % 1024) - 1;
