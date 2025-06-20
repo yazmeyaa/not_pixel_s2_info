@@ -185,7 +185,7 @@ setInterval(async () => {
     // bot.telegram.sendMessage(-1002622997505, text)
 }, 5000);
 
-bot.on('message', (ctx) => {
+bot.on('channel_post', (ctx) => {
     console.log(ctx.message.chat.last_name, ctx.message.chat.id, ctx.message.text)
 });
 
