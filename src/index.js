@@ -70,11 +70,14 @@ const getOnlineUsers = async () => {
 
 telegram_app.command('info', async (ctx) => {
     const currentUsers = await getOnlineUsers()
-    const percentage = (hourlySnapshot.total / (1024 ** 2)) * 100
+    const total = 1024 ** 2;
+    const percentage = (hourlySnapshot.total / total) * 100
+    const left = (1024 ** 2) - hourlySnapshot.total
+
 
     await ctx.react('👍')
     await ctx.reply(
-        `Pixels to mint left: ${hourlySnapshot.total.toLocaleString('en-US')}\n` +
+        `Pixels to mint left: ${left.toLocaleString('en-US')}\n` +
         `Total pixels: ${(1024 ** 2).toLocaleString('en-US')}\n` +
         `Minted: ${(percentage).toFixed(2)}%\n\n` +
         `Minted in 5m: ${(hourlySnapshot.total - hourlySnapshot['5m']).toLocaleString('en-US')}\n` +
