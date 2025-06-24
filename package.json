@@ -3,6 +3,8 @@
   "type": "module",
   "packageManager": "yarn@4.6.0",
   "dependencies": {
+    "@ton-api/client": "^0.4.0",
+    "@ton/core": "^0.61.0",
     "better-sqlite3": "^11.10.0",
     "eiows": "^8.2.0",
     "express": "^5.1.0",

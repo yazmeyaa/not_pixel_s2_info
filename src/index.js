@@ -1,197 +1,50 @@
 import { Telegraf } from 'telegraf'
 import rateLimit from 'telegraf-ratelimit'
 import DB from 'better-sqlite3'
-import { Server } from 'socket.io'
-import express from 'express'
+import { TonApiClient } from '@ton-api/client';
+import { Address } from '@ton/core'
 
 const db = new DB('db.sqlite');
 const telegram_app = new Telegraf(process.env.BOT_TOKEN);
-const API_URL = 'https://notpixel.org/api/v1/battle-canvas/pixels/filter-info';
-
-const insertRecord = (record) => {
-    const ts = Math.floor(Date.now() / 1000);
-    const insert = db.prepare('INSERT INTO records (ts, data) VALUES (?, ?)');
-    insert.run(ts, JSON.stringify(record));
-};
-
-const getRecordsBetweenDates = (date1ts, date2ts) => {
-    const rows = db.prepare('SELECT data FROM records WHERE ts BETWEEN ? AND ?').all(date1ts, date2ts)
-    console.log(rows);
-    return rows;
-}
-
-const saveCurrentSnapshot = () => {
-    const ts = Math.floor(Date.now() / 1000);
-    insertRecord(current);
-    previous = { ...current };
-    console.log(`[${new Date().toISOString()}] Snapshot saved at ts=${ts}`);
-};
-
-
-let current = {};
-let previous = {};
-
-async function fetchData() {
-    const response = await fetch(API_URL);
-    const json = await response.json();
-    return json.priceAvailability;
-}
-
-async function startDataSync() {
-    try {
-        const initial = await fetchData();
-        current = initial;
-        previous = { ...initial };
-    } catch (err) {
-        console.error('Initial fetch failed:', err);
-        throw err;
-    }
-
-    const updateCurrent = async () => {
-        try {
-            current = await fetchData();
-        } catch (err) {
-            console.error('Current fetch failed:', err);
-        }
-    };
-
-    const updatePrevious = () => {
-        previous = { ...current };
-    };
-
-    const now = new Date();
-    const msToNext10s = 10_000 - ((now.getSeconds() % 10) * 1000 + now.getMilliseconds());
-    setTimeout(() => {
-        updateCurrent();
-        setInterval(updateCurrent, 10_000);
-    }, msToNext10s);
-
-    const msToNextHour =
-        (60 - now.getMinutes()) * 60_000 -
-        now.getSeconds() * 1000 -
-        now.getMilliseconds();
-    setTimeout(() => {
-        saveCurrentSnapshot();
-        setInterval(saveCurrentSnapshot, 60 * 60_000);
-    }, msToNextHour);
-}
-
-telegram_app.command('pixels', (ctx) => {
-    if (!Object.keys(current).length || !Object.keys(previous).length) {
-        return ctx.reply('⏳ Данные еще загружаются...');
-    }
-
-    const lines = Object.keys(current).map((key) => {
-        const curr = current[key];
-        const prev = previous[key] ?? 0;
-        const delta = curr - prev;
-        const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
-        const deltaValue = Math.abs(delta);
-        return `${key} $PX => ${curr} pcs. (${sign}${deltaValue} pcs/hour)`;
-    });
-
-    ctx.reply(lines.join('\n'));
-});
-
-telegram_app.command('stats', (ctx) => {
-    const now = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(now.getDate() - 1);
-
-    const data = getRecordsBetweenDates(yesterday.getTime() / 1000, now.getTime() / 1000);
-    console.log(data);
-
-    ctx.reply("OK")
-})
-
-/**
- * 
- * @param {number} price 
- * @param {number} limit 
- * @returns {Promise<number[]>}
- */
-const getCoordinates = async (price = 1, limit = 10) => {
-    const response = await fetch(`https://notpixel.org/api/v1/battle-canvas/pixels/by-price?price=${price}&limit=${limit}`)
-    const json = await response.json();
-
-    return json;
-}
-
-telegram_app.command('filter', async (ctx) => {
-    const price = Number(ctx.args[0] ?? 4);
-
-    const coordsArray = await getCoordinates(price, 10);
-    if (coordsArray.length === 0) {
-        return ctx.reply(`There is no pixels found with price ${price}$PX`)
-    }
-    if (price === 1) {
-        ctx.reply("Attention!\nFilter by 1$PX may not work correctly.")
-    }
-    const coords = coordsArray.map(n => {
-        const x = (n % 1024) - 1;
-        const y = Math.floor(n / 1024);
-        return [x, y];
-    })
-
-    const linkList = coords.map(([x, y]) => {
-        const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
-
-        return link
-    })
-
-    const text = [`${price} $PX pixel links:\n`, ...linkList].join('\n');
-    ctx.reply(text);
-})
 
 telegram_app.catch(console.error);
 
-telegram_app.on('channel_post', (ctx) => {
-    console.log(ctx.chat.id)
+const ta = new TonApiClient({
+    baseUrl: 'https://tonapi.io',
+    apiKey: 'AFRANRCC2VJQ4MQAAAAHZJVF7PB2B5YNVM4GNUJI6VAMNS3VSCVPXSQK5E3DGG3UPDC6CEQ',
 });
 
-const app = express()
-const server = app.listen(53424, () => {
-    console.log('Listening on port 53424')
-})
-const io = new Server(server, {
-    cors: {
-        origin: '*'
-    }
-})
+const cachedUminted = {
+    updatedAt: new Date(0),
+    count: 0,
+}
+const collectionAddress = Address.parse('EQDxPnc-hOZTW5pxFFt56pny-W3UuEs7ktzf-tAGNCkxtOl1');
 
-app.use(express.static('public'))
-
-const hearthBeatGetPixel = (delay, price = 4) => {
-    setTimeout(async () => {
-        const coordsArray = await getCoordinates(price, 10);
-        console.clear();
-        const coords = coordsArray.map(n => {
-            const x = (n % 1024) - 1;
-            const y = Math.floor(n / 1024);
-            return [x, y];
-        })
-
-        const linkList = coords.map(([x, y]) => {
-            const link = `https://t.me/notpixel/app?startapp=x${x}_y${y}_mbattle`
-
-            return link
-        })
-
-        console.log(linkList)
-
-        io.emit('got_pixels', {
-            links: linkList
-        });
-
-        hearthBeatGetPixel(delay);
-    }, delay)
+async function updateUnminted(date) {
+    const collection = await ta.nft.getNftCollection(collectionAddress)
+    cachedUminted.count = (1024 ** 2) - collection.nextItemIndex;
+    cachedUminted.updatedAt = date;
 }
 
-hearthBeatGetPixel(300, 4);
+const getSeconds = (seconds) => 1000 * seconds;
+
+async function getUnminted() {
+    const now = new Date();
+    if (now.getTime() - cachedUminted.updatedAt.getTime() > getSeconds(3)) {
+        await updateUnminted(now);
+    }
+
+    return cachedUminted;
+}
+
+telegram_app.command('info', async (ctx) => {
+    const unmintedInfo = await getUnminted();
+    const percentage = (unmintedInfo.count / (1024 ** 2)) * 100;
+    await ctx.react('👍')
+    await ctx.reply(`Pixels to mint left: ${unmintedInfo.count}\nTotal pixels: ${1024 ** 2}\nMinted: ${100 - percentage.toFixed(2)}%`)
+});
 
 (async () => {
-    await startDataSync();
     telegram_app.use(rateLimit({ window: 1000, limit: 1 }));
-    io.listen(19572)
     telegram_app.launch();
 })();
