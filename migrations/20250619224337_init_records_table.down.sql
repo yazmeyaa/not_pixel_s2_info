@@ -1,1 +1,1 @@
-DROP TABLE records;
+DROP TABLE metrics;
