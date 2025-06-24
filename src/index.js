@@ -65,8 +65,8 @@ telegram_app.command('info', async (ctx) => {
     const percentage = (unmintedInfo.count / (1024 ** 2)) * 100;
     await ctx.react('👍')
     await ctx.reply(
-        `Pixels to mint left: ${unmintedInfo.count}\n` +
-        `Total pixels: ${1024 ** 2}\n` +
+        `Pixels to mint left: ${unmintedInfo.count.toLocaleString()}\n` +
+        `Total pixels: ${(1024 ** 2).toLocaleString()}\n` +
         `Minted: ${(100 - percentage.toFixed(2))}%\n` +
         `Minted per minute: ${cachedUminted.mintedPerMinute}`
     );
