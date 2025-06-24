@@ -49,26 +49,38 @@ async function updateUnminted(date) {
 async function getUnminted() {
     const now = new Date();
 
-    
+
     if (now.getTime() - cachedUminted.updatedAt.getTime() > getSeconds(3)) {
         await updateUnminted(now);
     }
-    if(cachedUminted.previousCount === 0) {
+    if (cachedUminted.previousCount === 0) {
         cachedUminted.previousCount = cachedUminted.count
     }
 
     return cachedUminted;
 }
 
+/**
+ * @returns {Promise<Number>}
+ */
+const getOnlineUsers = async () => {
+    const response = await fetch('https://notpixel.org/api/v1/history/online/stats');
+    const json = await response.json()
+
+    return json.current_visitors
+}
+
 telegram_app.command('info', async (ctx) => {
     const unmintedInfo = await getUnminted();
+    const currentUsers = await getOnlineUsers();
     const percentage = (unmintedInfo.count / (1024 ** 2)) * 100;
     await ctx.react('👍')
     await ctx.reply(
         `Pixels to mint left: ${unmintedInfo.count.toLocaleString()}\n` +
         `Total pixels: ${(1024 ** 2).toLocaleString()}\n` +
         `Minted: ${(100 - percentage.toFixed(2))}%\n` +
-        `Minted per minute: ${cachedUminted.mintedPerMinute}`
+        `Minted per minute: ${cachedUminted.mintedPerMinute}\n\n` +
+        `Online users: ${currentUsers}`
     );
 });
 
