@@ -38,17 +38,14 @@ async function updateSnapshot() {
     const now = new Date();
     const minutes = now.getMinutes();
 
-    if (minutes % 5 === 0) {
-        hourlySnapshot['5m'] = collection.nextItemIndex;
-    }
-    if (minutes % 10 === 0) {
-        hourlySnapshot['10m'] = collection.nextItemIndex;
-    }
-    if (minutes % 30 === 0) {
-        hourlySnapshot['30m'] = collection.nextItemIndex;
-    }
     if (minutes === 0) {
         hourlySnapshot['1h'] = collection.nextItemIndex;
+    } else if (minutes % 30 === 0) {
+        hourlySnapshot['30m'] = collection.nextItemIndex;
+    } else if (minutes % 10 === 0) {
+        hourlySnapshot['10m'] = collection.nextItemIndex;
+    } else if (minutes % 5 === 0) {
+        hourlySnapshot['5m'] = collection.nextItemIndex;
     }
 }
 
