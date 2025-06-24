@@ -28,58 +28,89 @@ const canvasRenderService = new ChartJSNodeCanvas({ width, height, chartCallback
 async function renderMetricsCharts(metrics) {
     const labels = metrics.map(m => new Date(m.ts).toLocaleTimeString('en-US', { hour12: false }));
 
+    const values = {
+        bank_reward: metrics.map(m => m.bank_reward),
+        current_online: metrics.map(m => m.current_online),
+        minted_pixels: metrics.map(m => m.minted_pixels),
+    };
+
     const datasets = {
         bank_reward: {
             label: 'Bank Reward ($PX)',
-            data: metrics.map(m => m.bank_reward),
+            data: values.bank_reward,
             borderColor: 'rgba(255, 99, 132, 1)',
             backgroundColor: 'rgba(255, 99, 132, 0.2)',
         },
         current_online: {
             label: 'Online Users',
-            data: metrics.map(m => m.current_online),
+            data: values.current_online,
             borderColor: 'rgba(54, 162, 235, 1)',
             backgroundColor: 'rgba(54, 162, 235, 0.2)',
         },
         minted_pixels: {
             label: 'Minted Pixels',
-            data: metrics.map(m => m.minted_pixels),
+            data: values.minted_pixels,
             borderColor: 'rgba(75, 192, 192, 1)',
             backgroundColor: 'rgba(75, 192, 192, 0.2)',
         }
     };
 
-    const options = {
-        responsive: false,
-        plugins: {
-            legend: { display: true },
-            title: { display: true, text: '' },
-        },
-        scales: {
-            x: { ticks: { maxTicksLimit: 20 }, title: { display: true, text: 'Time' } },
-            y: { beginAtZero: true },
-        }
+    const buildOptions = (title, dataArray) => {
+        const min = Math.min(...dataArray);
+        const max = Math.max(...dataArray);
+        const delta = max - min;
+        const margin = delta > 0 ? delta * 0.1 : max * 0.01; // 10% от разброса или 1% если линия плоская
+
+        return {
+            responsive: false,
+            plugins: {
+                legend: { display: true },
+                title: { display: true, text: title },
+            },
+            scales: {
+                x: {
+                    ticks: { maxTicksLimit: 20 },
+                    title: { display: true, text: 'Time' }
+                },
+                y: {
+                    beginAtZero: false,
+                    suggestedMin: min - margin,
+                    suggestedMax: max + margin,
+                    ticks: {
+                        callback: (value) => value.toLocaleString('en-US')
+                    }
+                }
+            }
+        };
     };
 
     globalThis.chartBankReward = await canvasRenderService.renderToBuffer({
         type: 'line',
         data: { labels, datasets: [datasets.bank_reward] },
-        options: { ...options, plugins: { ...options.plugins, title: { text: 'Bank Reward' } } }
+        options: buildOptions('Bank Reward ($PX)', values.bank_reward),
     });
 
     globalThis.chartOnline = await canvasRenderService.renderToBuffer({
         type: 'line',
         data: { labels, datasets: [datasets.current_online] },
-        options: { ...options, plugins: { ...options.plugins, title: { text: 'Online Users' } } }
+        options: buildOptions('Online Users', values.current_online),
     });
 
     globalThis.chartMintedPixels = await canvasRenderService.renderToBuffer({
         type: 'line',
         data: { labels, datasets: [datasets.minted_pixels] },
-        options: { ...options, plugins: { ...options.plugins, title: { text: 'Minted Pixels' } } }
+        options: buildOptions('Minted Pixels', values.minted_pixels),
     });
 }
 
+class Metric {
+    constructor(current_online, bank_reward, minted_pixels, ts) {
+        this.current_online = current_online;
+        this.bank_reward = bank_reward;
+        this.minted_pixels = minted_pixels;
+        this.ts = ts;
+    }
+}
 
 const db = SQLite3('db.sqlite')
 const insertStmt = db.prepare('INSERT INTO metrics (current_online, bank_reward, minted_pixels, ts) VALUES(@currentOnline, @bankReward, @mintedPixels, @timestamp)')
@@ -92,15 +123,6 @@ const saveMetrics = (currentOnline, bankReward, mintedPixels) => {
         timestamp: Date.now(),
     }
     insertStmt.run(params)
-}
-
-class Metric {
-    constructor(current_online, bank_reward, minted_pixels, ts) {
-        this.current_online = current_online;
-        this.bank_reward = bank_reward;
-        this.minted_pixels = minted_pixels;
-        this.ts = ts;
-    }
 }
 
 /**
@@ -118,7 +140,6 @@ const getMetrics = (from, to) => {
     }
     return resArray
 }
-
 
 const telegram_app = new Telegraf(process.env.BOT_TOKEN)
 const getSeconds = (seconds) => 1000 * seconds;
@@ -251,6 +272,11 @@ setInterval(async () => {
 
 (async () => {
     startDataCollectiong();
+    const from = new Date(Date.now() - getHours(24));
+    const to = new Date();
+    const metrics = getMetrics(from, to);
+
+    await renderMetricsCharts(metrics)
 
     telegram_app.use(rateLimit({ window: 1000, limit: 1 }))
     telegram_app.launch()
