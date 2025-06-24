@@ -1,8 +1,33 @@
-import { Telegraf } from 'telegraf'
-import rateLimit from 'telegraf-ratelimit'
-import { TonApiClient } from '@ton-api/client'
-import { Address } from '@ton/core'
-import SQLite3 from 'better-sqlite3'
+// Centralized error logging
+function logError(tag, error, extra = {}) {
+    const ts = new Date().toISOString();
+    const errObj = (error instanceof Error)
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { error };
+    console.error(`[${ts}] [${tag}]`, { ...errObj, ...extra });
+}
+
+async function catchError(tag, fn) {
+    try {
+        return await fn();
+    } catch (error) {
+        logError(tag, error);
+    }
+}
+
+process.on('unhandledRejection', (reason, p) => {
+    logError('unhandledRejection', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    logError('uncaughtException', err);
+});
+
+import { Telegraf } from 'telegraf';
+import rateLimit from 'telegraf-ratelimit';
+import { TonApiClient } from '@ton-api/client';
+import { Address } from '@ton/core';
+import SQLite3 from 'better-sqlite3';
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 
 /** @type {Buffer | null} */
@@ -11,7 +36,6 @@ globalThis.chartBankReward = null;
 globalThis.chartOnline = null;
 /** @type {Buffer | null} */
 globalThis.chartMintedPixels = null;
-
 
 const width = 800;
 const height = 400;
@@ -22,9 +46,6 @@ const chartCallback = (ChartJS) => {
 
 const canvasRenderService = new ChartJSNodeCanvas({ width, height, chartCallback });
 
-/**
- * @param {Array<Metric>} metrics
- */
 async function renderMetricsCharts(metrics) {
     const labels = metrics.map(m => new Date(m.ts).toLocaleTimeString('en-US', { hour12: false }));
 
@@ -59,7 +80,7 @@ async function renderMetricsCharts(metrics) {
         const min = Math.min(...dataArray);
         const max = Math.max(...dataArray);
         const delta = max - min;
-        const margin = delta > 0 ? delta * 0.1 : max * 0.01; // 10% от разброса или 1% если линия плоская
+        const margin = delta > 0 ? delta * 0.1 : max * 0.01;
 
         return {
             responsive: false,
@@ -112,126 +133,103 @@ class Metric {
     }
 }
 
-const db = SQLite3('db.sqlite')
-const insertStmt = db.prepare('INSERT INTO metrics (current_online, bank_reward, minted_pixels, ts) VALUES(@currentOnline, @bankReward, @mintedPixels, @timestamp)')
-const selectStmt = db.prepare('SELECT current_online, bank_reward, minted_pixels, ts FROM metrics WHERE ts BETWEEN @start AND @end')
-const saveMetrics = (currentOnline, bankReward, mintedPixels) => {
+const db = SQLite3('db.sqlite');
+const insertStmt = db.prepare('INSERT INTO metrics (current_online, bank_reward, minted_pixels, ts) VALUES(@currentOnline, @bankReward, @mintedPixels, @timestamp)');
+const selectStmt = db.prepare('SELECT current_online, bank_reward, minted_pixels, ts FROM metrics WHERE ts BETWEEN @start AND @end');
+
+function saveMetrics(currentOnline, bankReward, mintedPixels) {
     const params = {
         currentOnline,
         bankReward,
         mintedPixels,
         timestamp: Date.now(),
+    };
+    try {
+        insertStmt.run(params);
+    } catch (err) {
+        logError('db:insert', err, params);
     }
-    insertStmt.run(params)
 }
 
-/**
- * 
- * @param {Date} from 
- * @param {Date} to 
- */
-const getMetrics = (from, to) => {
-    const rows = selectStmt.all({ start: from.getTime(), end: to.getTime() })
-    /**@type {Array<Metric>} */
-    const resArray = [];
-    for (const row of rows) {
-        const metric = new Metric(row.current_online, row.bank_reward, row.minted_pixels, row.ts);
-        resArray.push(metric);
-    }
-    return resArray
+function getMetrics(from, to) {
+    const rows = selectStmt.all({ start: from.getTime(), end: to.getTime() });
+    const resArray = rows.map(row => new Metric(row.current_online, row.bank_reward, row.minted_pixels, row.ts));
+    return resArray;
 }
 
-const telegram_app = new Telegraf(process.env.BOT_TOKEN)
-const getSeconds = (seconds) => 1000 * seconds;
-const getMinutes = (minutes) => getSeconds(60) * minutes;
-const getHours = (hours) => getMinutes(60) * hours;
+const telegram_app = new Telegraf(process.env.BOT_TOKEN);
+const getSeconds = (s) => 1000 * s;
+const getMinutes = (m) => getSeconds(60) * m;
+const getHours = (h) => getMinutes(60) * h;
 
-telegram_app.catch(console.error)
+telegram_app.catch((err, ctx) => logError('telegraf', err));
 
-const createCache = (fn, ttlMs) => {
+function createCache(fn, ttlMs) {
     let cache = null;
     let cacheTime = 0;
-
     return async () => {
         const now = Date.now();
-        if (cache && now - cacheTime < ttlMs) {
-            return cache;
-        }
+        if (cache && now - cacheTime < ttlMs) return cache;
         cache = await fn();
         cacheTime = now;
         return cache;
     };
-};
+}
 
 const ta = new TonApiClient({
     baseUrl: 'https://tonapi.io',
-    apiKey: 'AFRANRCC2VJQ4MQAAAAHZJVF7PB2B5YNVM4GNUJI6VAMNS3VSCVPXSQK5E3DGG3UPDC6CEQ',
-})
-const collectionAddress = Address.parse('EQDxPnc-hOZTW5pxFFt56pny-W3UuEs7ktzf-tAGNCkxtOl1')
+    apiKey: 'AFRANRCC2VJQ4MQAAAAHZJVF7PB2B5YNVM4GNUJI6VAMNS3VSCVPXSQK5E3DGG3UPDC6CEQ'
+});
+const collectionAddress = Address.parse('EQDxPnc-hOZTW5pxFFt56pny-W3UuEs7ktzf-tAGNCkxtOl1');
 
-const mintingHistory = []
-
+const mintingHistory = [];
 function getMintedInLast(minutes) {
-    const now = Date.now();
-    const cutoff = now - getMinutes(minutes);
-    const relevant = mintingHistory.filter(entry => entry.time >= cutoff);
-
-    if (relevant.length === 0) return 0;
-
-    const oldest = relevant[0].value;
-    const newest = relevant[relevant.length - 1].value;
-    return newest - oldest;
+    const cutoff = Date.now() - getMinutes(minutes);
+    const relevant = mintingHistory.filter(e => e.time >= cutoff);
+    if (!relevant.length) return 0;
+    return relevant.at(-1).value - relevant[0].value;
 }
 
 const startDataCollectiong = async () => {
-    setInterval(async () => {
+    setInterval(() => catchError('mint-history', async () => {
         const collection = await ta.nft.getNftCollection(collectionAddress);
-        const entry = {
-            time: Date.now(),
-            value: collection.nextItemIndex,
-        };
-        mintingHistory.push(entry);
-
+        mintingHistory.push({ time: Date.now(), value: collection.nextItemIndex });
         const cutoff = Date.now() - getMinutes(60);
         while (mintingHistory.length && mintingHistory[0].time < cutoff) {
             mintingHistory.shift();
         }
-    }, getSeconds(2));
-}
+    }), getSeconds(2));
+};
 
 const getOnlineUsers = createCache(async () => {
-    const response = await fetch('https://notpixel.org/api/v1/history/online/stats')
-    const json = await response.json()
-    return json.current_visitors
-}, 1000)
+    const res = await fetch('https://notpixel.org/api/v1/history/online/stats');
+    return (await res.json()).current_visitors;
+}, 1000);
 
 const getBankInfo = createCache(async () => {
-    const response = await fetch('https://notpixel.org/api/v1/battle-canvas/info');
-    const json = await response.json();
-    return json.rewardBank;
+    const res = await fetch('https://notpixel.org/api/v1/battle-canvas/info');
+    return (await res.json()).rewardBank;
 }, 2000);
 
 const getTokenStats = createCache(async () => {
-    const response = await fetch('https://notpixel.org/api/v1/history/px/stats');
-    const json = await response.json();
-    return json;
+    const res = await fetch('https://notpixel.org/api/v1/history/px/stats');
+    return await res.json();
 }, 2000);
 
-telegram_app.command('info', async (ctx) => {
+telegram_app.command('info', ctx => catchError('tg:info', async () => {
     const [bankInfo, currentUsers, tokenStats] = await Promise.all([
         getBankInfo(),
         getOnlineUsers(),
         getTokenStats(),
-    ])
-
+    ]);
     const total = 1024 ** 2;
     const latest = mintingHistory.at(-1)?.value ?? 0;
     const percentage = (latest / total) * 100;
     const left = total - latest;
 
-    await ctx.react('👍')
+    await ctx.react('👍');
     await ctx.reply(
-        `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$) \n\n` +
+        `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)\n\n` +
         `Pixels to mint left: ${left.toLocaleString('en-US')}◾️\n` +
         `Total pixels: ${total.toLocaleString('en-US')}◾️\n` +
         `Minted: ${percentage.toFixed(2)}%\n\n` +
@@ -240,44 +238,34 @@ telegram_app.command('info', async (ctx) => {
         `Minted in 30m: ${getMintedInLast(30).toLocaleString('en-US')}◾️\n` +
         `Minted in 60m: ${getMintedInLast(60).toLocaleString('en-US')}◾️\n\n` +
         `🟢 Online users: ${currentUsers.toLocaleString('en-US')}`
-    )
-});
+    );
+}));
 
-telegram_app.command('stats', async (ctx) => {
+telegram_app.command('stats', ctx => catchError('tg:stats', async () => {
     await ctx.replyWithMediaGroup([
         { type: 'photo', media: { source: globalThis.chartBankReward }, caption: '🏦 Bank Reward' },
         { type: 'photo', media: { source: globalThis.chartOnline }, caption: '🟢 Online Users' },
         { type: 'photo', media: { source: globalThis.chartMintedPixels }, caption: '🖼 Minted Pixels' },
     ]);
-})
+}));
 
-setInterval(async () => {
-    const [bankInfo, currentUsers, tokenStats] = await Promise.all([
+setInterval(() => catchError('metrics-collector', async () => {
+    const [bankInfo, currentUsers] = await Promise.all([
         getBankInfo(),
         getOnlineUsers(),
-        getTokenStats(),
-    ])
-
+    ]);
     const lastMinted = mintingHistory.at(-1)?.value ?? 0;
-    if (!lastMinted || lastMinted === 0) return;
-
-    saveMetrics(currentUsers, bankInfo, lastMinted)
-
-    const from = new Date(Date.now() - getHours(24));
-    const to = new Date();
-    const metrics = getMetrics(from, to);
-
+    saveMetrics(currentUsers, bankInfo, lastMinted);
+    const metrics = getMetrics(new Date(Date.now() - getHours(24)), new Date());
     await renderMetricsCharts(metrics);
-}, getMinutes(5));
+}), getMinutes(5));
 
 (async () => {
-    startDataCollectiong();
-    const from = new Date(Date.now() - getHours(24));
-    const to = new Date();
-    const metrics = getMetrics(from, to);
-
-    await renderMetricsCharts(metrics)
-
-    telegram_app.use(rateLimit({ window: 1000, limit: 1 }))
-    telegram_app.launch()
-})()
+    await catchError('startup', async () => {
+        await startDataCollectiong();
+        const metrics = getMetrics(new Date(Date.now() - getHours(24)), new Date());
+        await renderMetricsCharts(metrics);
+        telegram_app.use(rateLimit({ window: 1000, limit: 1 }));
+        telegram_app.launch();
+    });
+})();
