@@ -1,90 +1,97 @@
 import { Telegraf } from 'telegraf'
 import rateLimit from 'telegraf-ratelimit'
-import DB from 'better-sqlite3'
-import { TonApiClient } from '@ton-api/client';
+import { TonApiClient } from '@ton-api/client'
 import { Address } from '@ton/core'
 
-const telegram_app = new Telegraf(process.env.BOT_TOKEN);
+const telegram_app = new Telegraf(process.env.BOT_TOKEN)
 const getSeconds = (seconds) => 1000 * seconds;
+const getMinutes = (minutes) => getSeconds(60) * minutes;
 
-
-telegram_app.catch(console.error);
+telegram_app.catch(console.error)
 
 const ta = new TonApiClient({
     baseUrl: 'https://tonapi.io',
     apiKey: 'AFRANRCC2VJQ4MQAAAAHZJVF7PB2B5YNVM4GNUJI6VAMNS3VSCVPXSQK5E3DGG3UPDC6CEQ',
-});
+})
+const collectionAddress = Address.parse('EQDxPnc-hOZTW5pxFFt56pny-W3UuEs7ktzf-tAGNCkxtOl1')
 
-const cachedUminted = {
-    updatedAt: new Date(0),
-    count: 0,
-    previousCount: 0,
-    mintedPerMinute: 0
+
+const hourlySnapshot = {
+    initiated: false,
+    total: 0,
+    "5m": 0,
+    "10m": 0,
+    "30m": 0,
+    "1h": 0,
 }
 
-setInterval(async () => {
-    try {
-        const now = new Date();
-        await updateUnminted(now);
+async function updateSnapshot() {
+    const collection = await ta.nft.getNftCollection(collectionAddress);
+    if (!hourlySnapshot.initiated) {
+        hourlySnapshot['5m'] = collection.nextItemIndex;
+        hourlySnapshot['10m'] = collection.nextItemIndex;
+        hourlySnapshot['30m'] = collection.nextItemIndex;
+        hourlySnapshot['1h'] = collection.nextItemIndex;
+        hourlySnapshot.initiated = true;
 
-        const delta = cachedUminted.previousCount - cachedUminted.count;
-        cachedUminted.mintedPerMinute = delta > 0 ? delta : 0;
-        cachedUminted.previousCount = cachedUminted.count;
-
-        console.log(`[${now.toISOString()}] Minted per minute: ${cachedUminted.mintedPerMinute}`);
-    } catch (err) {
-        console.error('Error in minute snapshot:', err);
     }
-}, getSeconds(60));
-
-const collectionAddress = Address.parse('EQDxPnc-hOZTW5pxFFt56pny-W3UuEs7ktzf-tAGNCkxtOl1');
-
-async function updateUnminted(date) {
-    const collection = await ta.nft.getNftCollection(collectionAddress)
-    cachedUminted.count = (1024 ** 2) - collection.nextItemIndex;
-    cachedUminted.updatedAt = date;
-}
-
-
-async function getUnminted() {
     const now = new Date();
+    const minutes = now.getMinutes();
 
-
-    if (now.getTime() - cachedUminted.updatedAt.getTime() > getSeconds(3)) {
-        await updateUnminted(now);
+    if (minutes % 5 === 0) {
+        hourlySnapshot['5m'] = collection.nextItemIndex;
     }
-    if (cachedUminted.previousCount === 0) {
-        cachedUminted.previousCount = cachedUminted.count
+    if (minutes % 10 === 0) {
+        hourlySnapshot['10m'] = collection.nextItemIndex;
     }
-
-    return cachedUminted;
+    if (minutes % 30 === 0) {
+        hourlySnapshot['30m'] = collection.nextItemIndex;
+    }
+    if (minutes === 0) {
+        hourlySnapshot['1h'] = collection.nextItemIndex;
+    }
 }
 
-/**
- * @returns {Promise<Number>}
- */
-const getOnlineUsers = async () => {
-    const response = await fetch('https://notpixel.org/api/v1/history/online/stats');
-    const json = await response.json()
+const startDataCollectiong = async () => {
+    setInterval(() => {
+        updateSnapshot()
+    }, getMinutes(1));
 
+    setInterval(async () => {
+        const collection = await ta.nft.getNftCollection(collectionAddress);
+        hourlySnapshot.total = collection.nextItemIndex;
+    }, getSeconds(2));
+}
+
+
+
+const getOnlineUsers = async () => {
+    const response = await fetch('https://notpixel.org/api/v1/history/online/stats')
+    const json = await response.json()
     return json.current_visitors
 }
 
 telegram_app.command('info', async (ctx) => {
-    const unmintedInfo = await getUnminted();
-    const currentUsers = await getOnlineUsers();
-    const percentage = (unmintedInfo.count / (1024 ** 2)) * 100;
+    const currentUsers = await getOnlineUsers()
+    const percentage = (hourlySnapshot.total / (1024 ** 2)) * 100
+
     await ctx.react('👍')
     await ctx.reply(
-        `Pixels to mint left: ${unmintedInfo.count.toLocaleString()}\n` +
-        `Total pixels: ${(1024 ** 2).toLocaleString()}\n` +
-        `Minted: ${(100 - percentage.toFixed(2))}%\n` +
-        `Minted per minute: ${cachedUminted.mintedPerMinute}\n\n` +
-        `Online users: ${currentUsers}`
-    );
+        `Pixels to mint left: ${hourlySnapshot.total.toLocaleString('en-US')}\n` +
+        `Total pixels: ${(1024 ** 2).toLocaleString('en-US')}\n` +
+        `Minted: ${(100 - percentage).toFixed(2)}%\n\n` +
+        `Minted in 5m: ${(hourlySnapshot.total - hourlySnapshot['5m']).toLocaleString('en-US')}\n` +
+        `Minted in 10m: ${(hourlySnapshot.total - hourlySnapshot['10m']).toLocaleString('en-US')}\n` +
+        `Minted in 30m: ${(hourlySnapshot.total - hourlySnapshot['30m']).toLocaleString('en-US')}\n` +
+        `Minted in 60m: ${(hourlySnapshot.total - hourlySnapshot['1h']).toLocaleString('en-US')}\n\n` +
+        `Online users: ${currentUsers.toLocaleString('en-US')}`
+    )
 });
 
 (async () => {
-    telegram_app.use(rateLimit({ window: 1000, limit: 1 }));
-    telegram_app.launch();
-})();
+    startDataCollectiong();
+    updateSnapshot();
+
+    telegram_app.use(rateLimit({ window: 1000, limit: 1 }))
+    telegram_app.launch()
+})()
