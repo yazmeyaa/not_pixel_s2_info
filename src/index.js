@@ -76,7 +76,7 @@ telegram_app.command('info', async (ctx) => {
     await ctx.reply(
         `Pixels to mint left: ${hourlySnapshot.total.toLocaleString('en-US')}\n` +
         `Total pixels: ${(1024 ** 2).toLocaleString('en-US')}\n` +
-        `Minted: ${(100 - percentage).toFixed(2)}%\n\n` +
+        `Minted: ${(percentage).toFixed(2)}%\n\n` +
         `Minted in 5m: ${(hourlySnapshot.total - hourlySnapshot['5m']).toLocaleString('en-US')}\n` +
         `Minted in 10m: ${(hourlySnapshot.total - hourlySnapshot['10m']).toLocaleString('en-US')}\n` +
         `Minted in 30m: ${(hourlySnapshot.total - hourlySnapshot['30m']).toLocaleString('en-US')}\n` +
