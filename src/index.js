@@ -225,20 +225,28 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
     const total = 1024 ** 2;
     const latest = mintingHistory.at(-1)?.value ?? 0;
     const percentage = (latest / total) * 100;
-    const left = total - latest;
+    const left = (total - latest) - 1;
+    console.log(left)
 
     await ctx.react('👍');
-    await ctx.reply(
-        `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)\n\n` +
-        `Pixels to mint left: ${left.toLocaleString('en-US')}◾️\n` +
-        `Total pixels: ${total.toLocaleString('en-US')}◾️\n` +
-        `Minted: ${percentage.toFixed(2)}%\n\n` +
-        `Minted in 5m: ${getMintedInLast(5).toLocaleString('en-US')}◾️\n` +
-        `Minted in 10m: ${getMintedInLast(10).toLocaleString('en-US')}◾️\n` +
-        `Minted in 30m: ${getMintedInLast(30).toLocaleString('en-US')}◾️\n` +
-        `Minted in 60m: ${getMintedInLast(60).toLocaleString('en-US')}◾️\n\n` +
-        `🟢 Online users: ${currentUsers.toLocaleString('en-US')}`
-    );
+
+    const replyResult = [];
+    replyResult.push(`💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)\n`)
+    if (left > 0) {
+        replyResult.push(`Pixels to mint left: ${left.toLocaleString('en-US')}◾️`)
+    }
+    replyResult.push(`Total pixels: ${total.toLocaleString('en-US')}◾️`)
+    replyResult.push(`Minted: ${percentage.toFixed(2)}%\n`)
+
+    if (left > 0) {
+        replyResult.push(`Minted in 5m: ${getMintedInLast(5).toLocaleString('en-US')}◾️`)
+        replyResult.push(`Minted in 10m: ${getMintedInLast(10).toLocaleString('en-US')}◾️`)
+        replyResult.push(`Minted in 30m: ${getMintedInLast(30).toLocaleString('en-US')}◾️`)
+        replyResult.push(`Minted in 60m: ${getMintedInLast(60).toLocaleString('en-US')}◾️\n`)
+    }
+    replyResult.push(`🟢 Online users: ${currentUsers.toLocaleString('en-US')}`)
+
+    await ctx.reply(replyResult.join('\n'));
 }));
 
 telegram_app.command('stats', ctx => catchError('tg:stats', async () => {
