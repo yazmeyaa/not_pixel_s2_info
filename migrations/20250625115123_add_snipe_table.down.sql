@@ -1,0 +1,2 @@
+DROP INDEX idx_snipe_target_pixel_wallet;
+DROP TABLE snipe_target_pixel;
