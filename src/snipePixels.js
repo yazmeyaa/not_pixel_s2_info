@@ -22,6 +22,7 @@ export class SnipePixel {
 const insertPixelStmt = db.prepare("INSERT INTO snipe_target_pixel (target_wallet, nft_item_address, x, y, price) VALUES (@targetWallet, @nftItemAddr, @x, @y, @price)");
 const getSnipeTargetPixelsStmt = db.prepare("SELECT target_wallet, nft_item_address, price, x, y FROM snipe_target_pixel WHERE target_wallet = @targetWallet AND price=@price ORDER BY price DESC LIMIT ? OFFSET ?")
 const deletePixelsByAddressStmt = db.prepare("DELETE FROM snipe_target_pixel WHERE target_wallet = @address")
+const countPixelsByAddressStmt = db.prepare("SELECT COUNT(target_wallet) as total FROM snipe_target_pixel WHERE target_wallet = @targetWallet AND price = @price");
 
 /**
  * 
@@ -47,14 +48,19 @@ export function saveSnipePixel(targetAddr, nft, x, y, price) {
  * @param {number} limit 
  * @param {number} price
  * @param {number} offset
- * @returns {SnipePixel[]}
+ * @returns {{pixels: SnipePixel[], total: number}}
  */
 export function getSnipePixels(targetAddr, price, limit, offset) {
-    console.log(toNano(price));
+    const count = countPixelsByAddressStmt.get({ targetWallet: targetAddr.toRawString(), price: toNano(price) })
+    console.log({ count })
     const rows = getSnipeTargetPixelsStmt.all({ targetWallet: targetAddr.toRawString(), price: toNano(price) }, limit, offset);
-    return rows.map(row => {
+    const pixels = rows.map(row => {
         return new SnipePixel(row.target_wallet, row.nft_item_address, row.x, row.y, row.price);
     });
+    return {
+        total: count.total,
+        pixels,
+    }
 }
 
 /**

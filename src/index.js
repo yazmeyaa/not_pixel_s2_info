@@ -122,7 +122,10 @@ const getSeconds = (s) => 1000 * s;
 const getMinutes = (m) => getSeconds(60) * m;
 const getHours = (h) => getMinutes(60) * h;
 
-const limiter = new Bottleneck({ minTime: 105, maxConcurrent: 1 });
+const RPS = process.env.TONAPI_RPS ?? 10;
+const minTime = 100 / RPS;
+
+const limiter = new Bottleneck({ minTime, maxConcurrent: 1 });
 const limitedFetch = limiter.wrap(fetch);
 
 const ta = new TonApiClient({
@@ -131,7 +134,7 @@ const ta = new TonApiClient({
     fetch: limitedFetch,
 });
 
-// --- Data fetching with cache ---
+// --- Data fetching with cache ---й
 function createCache(fn, ttlMs) {
     let cache = null;
     let cacheTime = 0;
@@ -191,11 +194,12 @@ telegram_app.command('snipe', async (ctx) => {
     const perPage = parseInt(ctx.args[3]);
 
     try {
-        const nfts = getSnipePixels(targetAddress, price, perPage, (page - 1) * perPage);
+        const { pixels: nfts, total } = getSnipePixels(targetAddress, price, perPage, (page - 1) * perPage);
         if (nfts.length < 1) {
             return await ctx.reply('Empty list.')
         }
-        let offset = 0;
+        const header = `Page ${page}/${Math.ceil(total / perPage)}:\n`
+        let offset = header.length + 1;
         const response = nfts.reduce((acc, curr) => {
             const text = `[x: ${curr.x}; y: ${curr.y}] - ${fromNano(curr.price)} $PX`;
             acc.entities.push({ type: "text_link", url: `https://t.me/notpixel/app?startapp=x${curr.x}_y${curr.y}_mbattle`, offset, length: text.length });
@@ -204,7 +208,7 @@ telegram_app.command('snipe', async (ctx) => {
             return acc;
         }, { entities: [], strings: [] });
 
-        await ctx.reply(response.strings.join('\n'), {
+        await ctx.reply([header, ...response.strings].join('\n'), {
             link_preview_options: { is_disabled: true },
             entities: response.entities,
         });
@@ -214,8 +218,22 @@ telegram_app.command('snipe', async (ctx) => {
     }
 });
 
+function formatDuration(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${hours.toString().padStart(2, '0')}:` +
+        `${minutes.toString().padStart(2, '0')}:` +
+        `${seconds.toString().padStart(2, '0')}`;
+}
+
+
+const NOT_PIXEL_JETTON_ADDRESS = Address.parse('EQB420yQsZobGcy0VYDfSKHpG2QQlw-j1f_tPu1J488I__PX');
 
 async function collectNfts(targetAddr, chatId) {
+    const startTime = Date.now();
     let offset = 0;
     let savedCount = 0;
     let stopLogging = false;
@@ -230,8 +248,7 @@ async function collectNfts(targetAddr, chatId) {
             await new Promise(res => setTimeout(res, 2000));
             try {
                 await telegram_app.telegram.editMessageText(chatId, messageId, undefined, `Saved ${savedCount} pixels...`);
-            } catch (e) {
-            }
+            } catch (_) { }
         }
     };
     updateProgress();
@@ -272,10 +289,12 @@ async function collectNfts(targetAddr, chatId) {
     }
 
     stopLogging = true;
-    await telegram_app.telegram.editMessageText(chatId, messageId, undefined, `Done. Saved ${savedCount} pixels.`);
-}
 
-const NOT_PIXEL_JETTON_ADDRESS = Address.parse('EQB420yQsZobGcy0VYDfSKHpG2QQlw-j1f_tPu1J488I__PX');
+    const durationMs = Date.now() - startTime;
+    const durationStr = formatDuration(durationMs);
+
+    await telegram_app.telegram.sendMessage(chatId, `✅ Done.\nSaved ${savedCount} pixels in ${durationStr}.`);
+}
 
 telegram_app.command('collect', async (ctx) => {
     if (ctx.args.length < 1) return await ctx.reply('Missed target address');
