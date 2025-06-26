@@ -125,7 +125,7 @@ const getHours = (h) => getMinutes(60) * h;
 const RPS = process.env.TONAPI_RPS ?? 10;
 const minTime = 100 / RPS;
 
-const limiter = new Bottleneck({ minTime, maxConcurrent: 1 });
+const limiter = new Bottleneck({ minTime: 110, maxConcurrent: 1 });
 const limitedFetch = limiter.wrap(fetch);
 
 const ta = new TonApiClient({
