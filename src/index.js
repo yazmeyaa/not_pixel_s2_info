@@ -170,7 +170,7 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
         getTokenStats(),
     ]);
 
-    const toBurn = bankInfo * 0.25;
+    const toBurn = ((bankInfo - 1_000_000) / 2);
     await ctx.react('👍');
     await ctx.reply([
         `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)\n`,
