@@ -162,6 +162,31 @@ const getTokenStats = createCache(async () => {
 const telegram_app = new Telegraf(process.env.BOT_TOKEN);
 telegram_app.catch((err, ctx) => logError('telegraf', err));
 
+const bankSnapshots = [];
+
+function updateSnapshots(currentValue) {
+    const now = Date.now();
+    bankSnapshots.push({ timestamp: now, value: currentValue });
+
+    const oneHourAgo = now - 60 * 60 * 1000;
+    while (bankSnapshots.length > 0 && bankSnapshots[0].timestamp < oneHourAgo) {
+        bankSnapshots.shift();
+    }
+}
+
+function getDelta(durationMs, currentValue) {
+    const targetTs = Date.now() - durationMs;
+    const snapshot = [...bankSnapshots]
+        .reverse()
+        .find(snap => snap.timestamp <= targetTs);
+
+    if (!snapshot) return null;
+
+    const delta = currentValue - snapshot.value;
+    const percent = ((delta / snapshot.value) * 100);
+    return { delta, percent };
+}
+
 // --- Commands ---
 telegram_app.command('info', ctx => catchError('tg:info', async () => {
     const [bankInfo, currentUsers, tokenStats] = await Promise.all([
@@ -170,11 +195,23 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
         getTokenStats(),
     ]);
 
+    const deltas = [
+        { label: '10m', result: getDelta(10 * 60 * 1000, bankInfo) },
+        { label: '30m', result: getDelta(30 * 60 * 1000, bankInfo) },
+        { label: '1h', result: getDelta(60 * 60 * 1000, bankInfo) },
+    ];
+
+    const deltaLines = deltas.map(({ label, result }) => {
+        if (!result) return `↔️ No data for ${label}`;
+        const arrow = result.delta > 0 ? '📈' : result.delta < 0 ? '📉' : '➖';
+        return `${arrow} ${label}: ${result.delta.toLocaleString('en-US')} PX (${result.percent.toFixed(2)}%)`;
+    });
+
     const toBurn = ((bankInfo - 1_000_000) / 2);
     await ctx.react('👍');
     await ctx.reply([
-        `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)\n`,
-        `Total pixels: ${(1024 ** 2).toLocaleString('en-US')}◾️`,
+        `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)`,
+        `📊 Bank change:\n${deltaLines.join('\n')}\n`,
         `🔥Pixels to burn ${toBurn.toLocaleString('en-US')} $PX🔥`,
         `🟢 Online users: ${currentUsers.toLocaleString('en-US')}`
     ].join('\n'));
@@ -318,9 +355,16 @@ setInterval(() => catchError('metrics-collector', async () => {
     await renderMetricsCharts(metrics);
 }), getMinutes(5));
 
+setInterval(async () => {
+    const bankInfo = await getBankInfo()
+    updateSnapshots(bankInfo);
+}, getSeconds(10));
+
 // --- Startup ---
 (async () => {
     await catchError('startup', async () => {
+        const bankInfo = await getBankInfo()
+        updateSnapshots(bankInfo);
         const metrics = getMetrics(new Date(Date.now() - getHours(24)), new Date());
         await renderMetricsCharts(metrics);
         telegram_app.launch();
