@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { TonApiClient } from '@ton-api/client';
 import { Address, fromNano } from '@ton/core';
-import SQLite3 from 'better-sqlite3';
+import { db } from './db.js'
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import { saveSnipePixel, getSnipePixels, deletePixelsByAddress } from './snipePixels.js';
 import Bottleneck from 'bottleneck';
@@ -98,7 +98,6 @@ class Metric {
         this.ts = ts;
     }
 }
-const db = SQLite3('db.sqlite');
 const insertStmt = db.prepare('INSERT INTO metrics (current_online, bank_reward, ts) VALUES(@currentOnline, @bankReward, @timestamp)');
 const selectStmt = db.prepare('SELECT current_online, bank_reward, ts FROM metrics WHERE ts BETWEEN @start AND @end');
 function saveMetrics(currentOnline, bankReward) {
@@ -123,9 +122,9 @@ const getMinutes = (m) => getSeconds(60) * m;
 const getHours = (h) => getMinutes(60) * h;
 
 const RPS = process.env.TONAPI_RPS ?? 10;
-const minTime = 100 / RPS;
+const minTime = (1000 / RPS) + 5;
 
-const limiter = new Bottleneck({ minTime: 110, maxConcurrent: 1 });
+const limiter = new Bottleneck({ minTime: minTime, maxConcurrent: 1 });
 const limitedFetch = limiter.wrap(fetch);
 
 const ta = new TonApiClient({
@@ -165,18 +164,18 @@ telegram_app.catch((err, ctx) => logError('telegraf', err));
 
 // --- Commands ---
 telegram_app.command('info', ctx => catchError('tg:info', async () => {
-    const start = new Date();
     const [bankInfo, currentUsers, tokenStats] = await Promise.all([
         getBankInfo(),
         getOnlineUsers(),
         getTokenStats(),
     ]);
-    const end = new Date()
-    console.log(end.getSeconds() - start.getSeconds())
+
+    const toBurn = bankInfo * 0.25;
     await ctx.react('👍');
     await ctx.reply([
         `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)\n`,
         `Total pixels: ${(1024 ** 2).toLocaleString('en-US')}◾️`,
+        `🔥Pixels to burn ${toBurn.toLocaleString('en-US')} $PX🔥`,
         `🟢 Online users: ${currentUsers.toLocaleString('en-US')}`
     ].join('\n'));
 }));
@@ -245,7 +244,7 @@ async function collectNfts(targetAddr, chatId) {
 
     const updateProgress = async () => {
         while (!stopLogging) {
-            await new Promise(res => setTimeout(res, 2000));
+            await new Promise(res => setTimeout(res, 3000));
             try {
                 await telegram_app.telegram.editMessageText(chatId, messageId, undefined, `Saved ${savedCount} pixels...`);
             } catch (_) { }
@@ -273,7 +272,7 @@ async function collectNfts(targetAddr, chatId) {
                     const balances = await ta.accounts.getAccountJettonsBalances(nft.address);
                     let pxBalance = balances.balances.find(b => b.jetton.address.equals(NOT_PIXEL_JETTON_ADDRESS))?.balance || BigInt(1e9);
 
-                    if (pxBalance === 1e9) {
+                    if (pxBalance === BigInt(1e9)) {
                         pxBalance = 2e9;
                     } else {
                         pxBalance = 4n * (pxBalance + BigInt(0.5e9));
