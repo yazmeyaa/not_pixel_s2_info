@@ -122,12 +122,12 @@ const getSeconds = (s) => 1000 * s;
 const getMinutes = (m) => getSeconds(60) * m;
 const getHours = (h) => getMinutes(60) * h;
 
-const limiter = new Bottleneck({ minTime: 111, maxConcurrent: 1 });
+const limiter = new Bottleneck({ minTime: 105, maxConcurrent: 1 });
 const limitedFetch = limiter.wrap(fetch);
 
 const ta = new TonApiClient({
     baseUrl: 'https://tonapi.io',
-    apiKey: 'AFRANRCC2VJQ4MQAAAAHZJVF7PB2B5YNVM4GNUJI6VAMNS3VSCVPXSQK5E3DGG3UPDC6CEQ',
+    apiKey: 'AFRANRCCXL2DBDIAAAAFEVPZWRHEDNYD43O2J43MNTSEC7XDP44AIWH53JQGVPBQEMRCS7I',
     fetch: limitedFetch,
 });
 
