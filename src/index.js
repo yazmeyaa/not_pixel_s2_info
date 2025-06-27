@@ -168,8 +168,9 @@ function updateSnapshots(currentValue) {
     const now = Date.now();
     bankSnapshots.push({ timestamp: now, value: currentValue });
 
-    const oneHourAgo = now - 60 * 60 * 1000;
-    while (bankSnapshots.length > 0 && bankSnapshots[0].timestamp < oneHourAgo) {
+    const retentionWindow = 120 * 60 * 1000;
+    const cutoff = now - retentionWindow;
+    while (bankSnapshots.length > 0 && bankSnapshots[0].timestamp < cutoff) {
         bankSnapshots.shift();
     }
 }
