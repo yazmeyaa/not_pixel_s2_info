@@ -292,8 +292,8 @@ telegram_app.command('snipe', async (ctx) => {
         }
         const header = `Page ${page}/${Math.ceil(total / perPage)}:\n`
         let offset = header.length + 1;
-        const response = nfts.reduce((acc, curr) => {
-            const text = `[x: ${curr.x}; y: ${curr.y}] - ${fromNano(curr.price)} $PX`;
+        const response = nfts.reduce((acc, curr, idx) => {
+            const text = `${idx + 1}. [x: ${curr.x}; y: ${curr.y}] - ${fromNano(curr.price)} $PX`;
             acc.entities.push({ type: "text_link", url: `https://t.me/notpixel/app?startapp=x${curr.x}_y${curr.y}_mbattle`, offset, length: text.length });
             acc.strings.push(text);
             offset += text.length + 1;
