@@ -3,8 +3,9 @@ import { TonApiClient } from '@ton-api/client';
 import { Address, fromNano } from '@ton/core';
 import { db } from './db.js'
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
-import { saveSnipePixel, getSnipePixels, deletePixelsByAddress } from './snipePixels.js';
+import { saveSnipePixel, getSnipePixelsByPrice, deletePixelsByAddress, getSnipeAllPixels } from './snipePixels.js';
 import Bottleneck from 'bottleneck';
+import { utils, write } from 'xlsx'
 
 // --- Global Error Handling ---
 function logError(tag, error, extra = {}) {
@@ -216,12 +217,66 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
         `🟢 Online users: ${currentUsers.toLocaleString('en-US')}`
     ].join('\n'));
 }));
+
 telegram_app.command('stats', ctx => catchError('tg:stats', async () => {
     await ctx.replyWithMediaGroup([
         { type: 'photo', media: { source: globalThis.chartBankReward }, caption: '🏦 Bank Reward' },
         { type: 'photo', media: { source: globalThis.chartOnline }, caption: '🟢 Online Users' },
     ]);
 }));
+
+telegram_app.command('snipe_xlsx', async (ctx) => {
+    if (ctx.args.length < 1) {
+        return await ctx.reply('Target address is missing');
+    }
+
+    let addr;
+    try {
+        addr = Address.parse(ctx.args[0]);
+    } catch (error) {
+        logError('snipe_xlsx', error);
+        return await ctx.reply('Wrong address');
+    }
+
+    const nfts = getSnipeAllPixels(addr); // Предположим, sync fn. Если async — добавь await.
+
+    if (!nfts || nfts.length === 0) {
+        return await ctx.reply('Empty list');
+    }
+
+    // Колонки в нужном порядке
+    const headers = ['Цена (PX)', 'Адрес NFT', 'X', 'Y', 'Ссылка'];
+    const fieldMap = {
+        'Цена (PX)': r => fromNano(r.price),
+        'Адрес NFT': r => r.nft_item_address.toString(),
+        'X': r => r.x,
+        'Y': r => r.y,
+        'Ссылка': r => `https://t.me/notpixel/app?startapp=x${r.x}_y${r.y}_mbattle`,
+    };
+
+    const rows = nfts.map(record =>
+        Object.fromEntries(headers.map(h => [h, fieldMap[h](record)]))
+    );
+
+    const worksheet = utils.json_to_sheet(rows, { header: headers });
+
+    worksheet['!cols'] = headers.map(h => {
+        const maxLen = Math.max(
+            h.length,
+            ...rows.map(row => String(row[h] ?? '').length)
+        );
+        return { wch: maxLen + 2 };
+    });
+
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, 'pixels');
+
+    const buffer = write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    const shortAddr = [addr.toRawString().slice(0, 5), addr.toRawString().slice(-5, -1)].join('...');
+    await ctx.replyWithDocument({ source: buffer, filename: `${shortAddr}.xlsx` });
+});
+
 telegram_app.command('snipe', async (ctx) => {
     if (ctx.args.length < 3) return await ctx.reply('Wrong command usage\n/snipe {address} {price} {page} {page_size}');
     const targetAddress = Address.parse(ctx.args[0]);
@@ -230,7 +285,7 @@ telegram_app.command('snipe', async (ctx) => {
     const perPage = parseInt(ctx.args[3]);
 
     try {
-        const { pixels: nfts, total } = getSnipePixels(targetAddress, price, perPage, (page - 1) * perPage);
+        const { pixels: nfts, total } = getSnipePixelsByPrice(targetAddress, price, perPage, (page - 1) * perPage);
         if (nfts.length < 1) {
             return await ctx.reply('Empty list.')
         }
