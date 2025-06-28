@@ -3,7 +3,7 @@ import { TonApiClient } from '@ton-api/client';
 import { Address, fromNano } from '@ton/core';
 import { db } from './db.js'
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
-import { saveSnipePixel, getSnipePixelsByPrice, deletePixelsByAddress, getSnipeAllPixels, getPixelsByPriceAndLock } from './snipePixels.js';
+import { saveSnipePixel, getSnipePixelsByPrice, deletePixelsByAddress, getSnipeAllPixels, getPixelsByPriceAndLock, countTargetPrices } from './snipePixels.js';
 import Bottleneck from 'bottleneck';
 import { utils, write } from 'xlsx'
 
@@ -388,6 +388,30 @@ async function collectNfts(targetAddr, chatId) {
     await telegram_app.telegram.sendMessage(chatId, `✅ Done.\nSaved ${savedCount} pixels in ${durationStr}.`);
 }
 
+telegram_app.command('snipe_stats', async (ctx) => {
+    if (ctx.args.length < 1) {
+        return await ctx.reply('/snipe_stats {address}')
+    }
+
+    const targetAddr = ctx.args[0]
+    /**@type {import('@ton/core').Address | null} */
+    let addr = null;
+    try {
+        addr = Address.parse(targetAddr);
+    }
+    catch (error) {
+        await ctx.reply('Wrong address');
+    }
+
+    const result = countTargetPrices(addr);
+    if (Object.keys(result).length === 0) {
+        return await ctx.reply("Empty list.")
+    }
+
+    const replyMsg = Object.entries(result).map(([key, value]) => `${fromNano(key)} $PX: ${value} pixels`).join('\n');
+    return await ctx.reply(replyMsg);
+
+})
 
 telegram_app.command('take', async (ctx) => {
     if (ctx.args.length < 3) {

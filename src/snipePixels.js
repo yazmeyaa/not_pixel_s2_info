@@ -40,6 +40,25 @@ const lockPixelsBase = (addressPlaceholders) => db.prepare(`
     SET in_work = 1
     WHERE nft_item_address IN (${addressPlaceholders})
 `);
+
+const countPricesStmt = db.prepare(`
+    SELECT price, COUNT(*) as count FROM snipe_target_pixel WHERE target_wallet = @targetWallet GROUP BY price`);
+
+/**
+ * 
+ * @param {import('@ton/core').Address} target
+ * @returns {Record<string, number>}
+ */
+export function countTargetPrices(target) {
+    const rows = countPricesStmt.all({ targetWallet: target.toRawString() });
+    const result = {};
+    for (const row of rows) {
+        result[row.price] = row.count;
+    }
+
+    return result;
+}
+
 /**
  * 
  * @param {import('@ton/core').Address} targetAddr 
@@ -108,7 +127,7 @@ export function getPixelsByPriceAndLock(address, price, limit) {
     const rawAddress = address.toRawString();
     const pixelsRows = db.transaction(() => {
         const rows = getPixelsStmt.all({ targetWallet: rawAddress, price: toNano(price) }, limit);
-        if (rows.length === 0) return {total: 0, rows: []};
+        if (rows.length === 0) return { total: 0, rows: [] };
 
         const addressMap = {};
         const placeholders = rows.map((row, i) => {
@@ -124,8 +143,6 @@ export function getPixelsByPriceAndLock(address, price, limit) {
     })();
 
     const { rows, total } = pixelsRows;
-
-    console.log(rows)
 
     const pixels = rows.map(row =>
         new SnipePixel(row.target_wallet, row.nft_item_address, row.x, row.y, row.price)
