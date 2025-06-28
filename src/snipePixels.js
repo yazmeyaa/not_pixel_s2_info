@@ -108,7 +108,7 @@ export function getPixelsByPriceAndLock(address, price, limit) {
     const rawAddress = address.toRawString();
     const pixelsRows = db.transaction(() => {
         const rows = getPixelsStmt.all({ targetWallet: rawAddress, price: toNano(price) }, limit);
-        if (rows.length === 0) return [];
+        if (rows.length === 0) return {total: 0, rows: []};
 
         const addressMap = {};
         const placeholders = rows.map((row, i) => {
@@ -120,15 +120,16 @@ export function getPixelsByPriceAndLock(address, price, limit) {
         lockPixelsBase(placeholders).run(addressMap);
         /** @type {{total: number}} */
         const total = countAvailable.get({ targetWallet: rawAddress, price: toNano(price) })
-
-        return { rows, total: total.total };
+        return { rows: rows, total: total.total };
     })();
 
-    const {rows, total} = pixelsRows;
-    
+    const { rows, total } = pixelsRows;
+
+    console.log(rows)
+
     const pixels = rows.map(row =>
         new SnipePixel(row.target_wallet, row.nft_item_address, row.x, row.y, row.price)
     );
 
-    return {pixels, total}
+    return { pixels, total }
 }
