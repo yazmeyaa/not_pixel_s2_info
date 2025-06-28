@@ -3,7 +3,7 @@ import { TonApiClient } from '@ton-api/client';
 import { Address, fromNano } from '@ton/core';
 import { db } from './db.js'
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
-import { saveSnipePixel, getSnipePixelsByPrice, deletePixelsByAddress, getSnipeAllPixels } from './snipePixels.js';
+import { saveSnipePixel, getSnipePixelsByPrice, deletePixelsByAddress, getSnipeAllPixels, getPixelsByPriceAndLock } from './snipePixels.js';
 import Bottleneck from 'bottleneck';
 import { utils, write } from 'xlsx'
 
@@ -387,6 +387,37 @@ async function collectNfts(targetAddr, chatId) {
 
     await telegram_app.telegram.sendMessage(chatId, `✅ Done.\nSaved ${savedCount} pixels in ${durationStr}.`);
 }
+
+
+telegram_app.command('take', async (ctx) => {
+    if (ctx.args.length < 3) {
+        return await ctx.reply('/take {address} {price} {count}')
+    }
+    const targetAddress = ctx.args[0];
+    const price = parseInt(ctx.args[1]);
+    const count = parseInt(ctx.args[2]);
+
+    const target = Address.parse(targetAddress);
+
+    const { pixels: nfts, total } = getPixelsByPriceAndLock(target, price, count);
+    if (nfts.length === 0) {
+        return await ctx.reply("Empty list.")
+    }
+
+    let offset = 0;
+    const response = nfts.reduce((acc, curr, idx) => {
+        const text = `${idx + 1}. [x: ${curr.x}; y: ${curr.y}] - ${fromNano(curr.price)} $PX`;
+        acc.entities.push({ type: "text_link", url: `https://t.me/notpixel/app?startapp=x${curr.x}_y${curr.y}_mbattle`, offset, length: text.length });
+        acc.strings.push(text);
+        offset += text.length + 1;
+        return acc;
+    }, { entities: [], strings: [] });
+
+    await ctx.reply([response.strings.join('\n'), '\n', `Left ${total} pixels with price ${price} $PX.`].join('\n'), {
+        link_preview_options: { is_disabled: true },
+        entities: response.entities,
+    });
+})
 
 telegram_app.command('collect', async (ctx) => {
     if (ctx.args.length < 1) return await ctx.reply('Missed target address');

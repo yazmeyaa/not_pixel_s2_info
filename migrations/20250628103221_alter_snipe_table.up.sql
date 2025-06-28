@@ -1,0 +1,1 @@
+ALTER TABLE snipe_target_pixel ADD COLUMN in_work BOOLEAN NOT NULL DEFAULT 0;

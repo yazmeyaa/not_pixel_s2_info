@@ -20,11 +20,26 @@ export class SnipePixel {
 }
 
 const insertPixelStmt = db.prepare("INSERT INTO snipe_target_pixel (target_wallet, nft_item_address, x, y, price) VALUES (@targetWallet, @nftItemAddr, @x, @y, @price)");
-const getSnipeTargetPixelsStmt = db.prepare("SELECT target_wallet, nft_item_address, price, x, y FROM snipe_target_pixel WHERE target_wallet = @targetWallet AND price=@price ORDER BY price DESC LIMIT ? OFFSET ?")
+const getSnipeTargetPixelsStmt = db.prepare("SELECT target_wallet, nft_item_address, price, x, y FROM snipe_target_pixel WHERE target_wallet = @targetWallet AND price=@price AND in_work=0 ORDER BY price DESC LIMIT ? OFFSET ?")
 const deletePixelsByAddressStmt = db.prepare("DELETE FROM snipe_target_pixel WHERE target_wallet = @address")
-const countPixelsByAddressStmt = db.prepare("SELECT COUNT(target_wallet) as total FROM snipe_target_pixel WHERE target_wallet = @targetWallet AND price = @price");
-const getAllPixelsByAddressStmt = db.prepare("SELECT target_wallet, nft_item_address, price, x, y FROM snipe_target_pixel WHERE target_wallet = @targetWallet ORDER BY price ASC")
-
+const countPixelsByAddressStmt = db.prepare("SELECT COUNT(target_wallet) as total FROM snipe_target_pixel WHERE target_wallet = @targetWallet AND price = @price AND in_work=0");
+const getAllPixelsByAddressStmt = db.prepare("SELECT target_wallet, nft_item_address, price, x, y, in_work FROM snipe_target_pixel WHERE target_wallet = @targetWallet ORDER BY price ASC")
+const getPixelsStmt = db.prepare(`
+    SELECT target_wallet, nft_item_address, price, x, y
+    FROM snipe_target_pixel
+    WHERE target_wallet = @targetWallet AND price = @price AND in_work = 0
+    LIMIT ?
+`);
+const countAvailable = db.prepare(`
+    SELECT COUNT(nft_item_address) as total
+    FROM snipe_target_pixel
+    WHERE target_wallet = @targetWallet AND price = @price AND in_work = 0
+`)
+const lockPixelsBase = (addressPlaceholders) => db.prepare(`
+    UPDATE snipe_target_pixel
+    SET in_work = 1
+    WHERE nft_item_address IN (${addressPlaceholders})
+`);
 /**
  * 
  * @param {import('@ton/core').Address} targetAddr 
@@ -79,4 +94,41 @@ export function getSnipeAllPixels(targetAddr) {
  */
 export function deletePixelsByAddress(address) {
     deletePixelsByAddressStmt.run({ address: address.toRawString() })
+}
+
+
+/**
+ * 
+ * @param {import('@ton/core').Address} address 
+ * @param {number} price 
+ * @param {number} limit 
+ * @returns {{pixels: SnipePixel[], total: number}}
+ */
+export function getPixelsByPriceAndLock(address, price, limit) {
+    const rawAddress = address.toRawString();
+    const pixelsRows = db.transaction(() => {
+        const rows = getPixelsStmt.all({ targetWallet: rawAddress, price: toNano(price) }, limit);
+        if (rows.length === 0) return [];
+
+        const addressMap = {};
+        const placeholders = rows.map((row, i) => {
+            const key = `a${i}`;
+            addressMap[key] = row.nft_item_address;
+            return `@${key}`;
+        }).join(', ');
+
+        lockPixelsBase(placeholders).run(addressMap);
+        /** @type {{total: number}} */
+        const total = countAvailable.get({ targetWallet: rawAddress, price: toNano(price) })
+
+        return { rows, total: total.total };
+    })();
+
+    const {rows, total} = pixelsRows;
+    
+    const pixels = rows.map(row =>
+        new SnipePixel(row.target_wallet, row.nft_item_address, row.x, row.y, row.price)
+    );
+
+    return {pixels, total}
 }

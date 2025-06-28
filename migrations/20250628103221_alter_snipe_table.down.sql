@@ -1,0 +1,1 @@
+ALTER TABLE snipe_target_pixel DROP COLUMN in_work;
