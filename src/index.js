@@ -6,6 +6,8 @@ import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import { saveSnipePixel, getSnipePixelsByPrice, deletePixelsByAddress, getSnipeAllPixels, getPixelsByPriceAndLock, countTargetPrices } from './snipePixels.js';
 import Bottleneck from 'bottleneck';
 import { utils, write } from 'xlsx'
+import { addUser, addUserAccess, checkAccess, getUserByTelegramID, User } from './user.js';
+import rateLimit from 'telegraf-ratelimit'
 
 // --- Global Error Handling ---
 function logError(tag, error, extra = {}) {
@@ -122,7 +124,7 @@ const getSeconds = (s) => 1000 * s;
 const getMinutes = (m) => getSeconds(60) * m;
 const getHours = (h) => getMinutes(60) * h;
 
-const RPS = process.env.TONAPI_RPS ?? 10;
+const RPS = Number.parseInt(process.env.TONAPI_RPS) ?? 10;
 const minTime = (1000 / RPS) + 5;
 
 const limiter = new Bottleneck({ minTime: minTime, maxConcurrent: 1 });
@@ -189,6 +191,34 @@ function getDelta(durationMs, currentValue) {
     return { delta, percent };
 }
 
+function isRealUser(ctx) {
+    if (!ctx.from) return false;
+    if (ctx.from.is_bot) return false;
+    if (ctx.chat && ctx.chat.type === 'channel') return false;
+    return true;
+}
+
+telegram_app.use((ctx, next) => {
+    const isUser = isRealUser(ctx);
+    if (isUser) {
+        const user = getUserByTelegramID(ctx.from.id);
+        ctx.state = ctx.state || {};
+        ctx.state.user = user;
+        if (!user) {
+            console.log(`[${new Date().toLocaleTimeString()}]: User registred. TelegramID: ${ctx.from.id}, Name: ${ctx.from.first_name}`)
+            addUser(ctx.from.id);
+        }
+    }
+
+    return next()
+})
+
+const limitOptions = {
+    window: 1000,
+    limit: 3,
+}
+telegram_app.use(rateLimit(limitOptions))
+
 // --- Commands ---
 telegram_app.command('info', ctx => catchError('tg:info', async () => {
     const [bankInfo, currentUsers, tokenStats] = await Promise.all([
@@ -239,13 +269,12 @@ telegram_app.command('snipe_xlsx', async (ctx) => {
         return await ctx.reply('Wrong address');
     }
 
-    const nfts = getSnipeAllPixels(addr); // Предположим, sync fn. Если async — добавь await.
+    const nfts = getSnipeAllPixels(addr);
 
     if (!nfts || nfts.length === 0) {
         return await ctx.reply('Empty list');
     }
 
-    // Колонки в нужном порядке
     const headers = ['Цена (PX)', 'Адрес NFT', 'X', 'Y', 'Ссылка'];
     const fieldMap = {
         'Цена (PX)': r => fromNano(r.price),
@@ -278,7 +307,37 @@ telegram_app.command('snipe_xlsx', async (ctx) => {
     await ctx.replyWithDocument({ source: buffer, filename: `${shortAddr}.xlsx` });
 });
 
+telegram_app.command('add_access', async (ctx) => {
+    // /**@type {User} */
+    // const user = ctx.state.user
+    // if (!checkAccess(user, 'access_management')) {
+    //     return await ctx.reply("ERR_NO_ACCESS");
+    // }
+    const target = ctx.message.reply_to_message.from.id;
+    if (ctx.args.length < 1) {
+        return await ctx.reply('missed ACCESS argument');
+    }
+    const access = ctx.args[0];
+    if (!target) {
+        return await ctx.reply('missed reply target');
+    }
+    let targetUser = getUserByTelegramID(target);
+    if (!targetUser) {
+        addUser(target);
+        targetUser = getUserByTelegramID(target);
+    }
+    addUserAccess(targetUser, access);
+    return await ctx.reply('OK!')
+})
+
 telegram_app.command('snipe', async (ctx) => {
+    /**@type {User} */
+    const user = ctx.state.user;
+    const hasAccess = checkAccess(user, 'snipe');
+    if (!hasAccess) {
+        return await ctx.reply("ERR_NO_ACCESS")
+    }
+
     if (ctx.args.length < 3) return await ctx.reply('Wrong command usage\n/snipe {address} {price} {page} {page_size}');
     const targetAddress = Address.parse(ctx.args[0]);
     const price = parseInt(ctx.args[1]);
@@ -389,6 +448,12 @@ async function collectNfts(targetAddr, chatId) {
 }
 
 telegram_app.command('snipe_stats', async (ctx) => {
+    /**@type {User} */
+    const user = ctx.state.user;
+    const hasAccess = checkAccess(user, 'snipe');
+    if (!hasAccess) {
+        return await ctx.reply("ERR_NO_ACCESS")
+    }
     if (ctx.args.length < 1) {
         return await ctx.reply('/snipe_stats {address}')
     }
@@ -414,6 +479,12 @@ telegram_app.command('snipe_stats', async (ctx) => {
 })
 
 telegram_app.command('take', async (ctx) => {
+    /**@type {User} */
+    const user = ctx.state.user;
+    const hasAccess = checkAccess(user, 'snipe');
+    if (!hasAccess) {
+        return await ctx.reply("ERR_NO_ACCESS")
+    }
     if (ctx.args.length < 3) {
         return await ctx.reply('/take {address} {price} {count}')
     }
@@ -444,6 +515,12 @@ telegram_app.command('take', async (ctx) => {
 })
 
 telegram_app.command('collect', async (ctx) => {
+    /**@type {User} */
+    const user = ctx.state.user;
+    const hasAccess = checkAccess(user, 'snipe');
+    if (!hasAccess) {
+        return await ctx.reply("ERR_NO_ACCESS")
+    }
     if (ctx.args.length < 1) return await ctx.reply('Missed target address');
     const targetAddr = Address.parse(ctx.args[0]);
     deletePixelsByAddress(targetAddr);
@@ -457,6 +534,7 @@ telegram_app.command('collect', async (ctx) => {
         logError('collect', err);
     }));
 });
+
 
 // --- Metrics Polling ---
 setInterval(() => catchError('metrics-collector', async () => {
