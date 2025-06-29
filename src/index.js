@@ -136,6 +136,22 @@ const ta = new TonApiClient({
     fetch: limitedFetch,
 });
 
+/**
+ * 
+ * @param {string} access 
+ * @returns 
+ */
+const withAccessMiddleware = (access) => {
+    return async (ctx, next) => {
+        /**@type {User} */
+        const user = ctx.state.user
+        if (!checkAccess(user, access)) {
+            return await ctx.reply("ERR_NO_ACCESS");
+        }
+        return next();
+    }
+}
+
 // --- Data fetching with cache ---й
 function createCache(fn, ttlMs) {
     let cache = null;
@@ -256,7 +272,7 @@ telegram_app.command('stats', ctx => catchError('tg:stats', async () => {
     ]);
 }));
 
-telegram_app.command('snipe_xlsx', async (ctx) => {
+telegram_app.command('snipe_xlsx', withAccessMiddleware('snipe'), async (ctx) => {
     if (ctx.args.length < 1) {
         return await ctx.reply('Target address is missing');
     }
@@ -307,12 +323,7 @@ telegram_app.command('snipe_xlsx', async (ctx) => {
     await ctx.replyWithDocument({ source: buffer, filename: `${shortAddr}.xlsx` });
 });
 
-telegram_app.command('add_access', async (ctx) => {
-    /**@type {User} */
-    const user = ctx.state.user
-    if (!checkAccess(user, 'access_management')) {
-        return await ctx.reply("ERR_NO_ACCESS");
-    }
+telegram_app.command('add_access', withAccessMiddleware('access_management'), async (ctx) => {
     const target = ctx.message.reply_to_message.from.id;
     if (ctx.args.length < 1) {
         return await ctx.reply('missed ACCESS argument');
@@ -330,14 +341,7 @@ telegram_app.command('add_access', async (ctx) => {
     return await ctx.reply('OK!')
 })
 
-telegram_app.command('snipe', async (ctx) => {
-    /**@type {User} */
-    const user = ctx.state.user;
-    const hasAccess = checkAccess(user, 'snipe');
-    if (!hasAccess) {
-        return await ctx.reply("ERR_NO_ACCESS")
-    }
-
+telegram_app.command('snipe', withAccessMiddleware('snipe'), async (ctx) => {
     if (ctx.args.length < 3) return await ctx.reply('Wrong command usage\n/snipe {address} {price} {page} {page_size}');
     const targetAddress = Address.parse(ctx.args[0]);
     const price = parseInt(ctx.args[1]);
@@ -447,13 +451,7 @@ async function collectNfts(targetAddr, chatId) {
     await telegram_app.telegram.sendMessage(chatId, `✅ Done.\nSaved ${savedCount} pixels in ${durationStr}.`);
 }
 
-telegram_app.command('snipe_stats', async (ctx) => {
-    /**@type {User} */
-    const user = ctx.state.user;
-    const hasAccess = checkAccess(user, 'snipe');
-    if (!hasAccess) {
-        return await ctx.reply("ERR_NO_ACCESS")
-    }
+telegram_app.command('snipe_stats', withAccessMiddleware('snipe'), async (ctx) => {
     if (ctx.args.length < 1) {
         return await ctx.reply('/snipe_stats {address}')
     }
@@ -478,13 +476,7 @@ telegram_app.command('snipe_stats', async (ctx) => {
 
 })
 
-telegram_app.command('take', async (ctx) => {
-    /**@type {User} */
-    const user = ctx.state.user;
-    const hasAccess = checkAccess(user, 'snipe');
-    if (!hasAccess) {
-        return await ctx.reply("ERR_NO_ACCESS")
-    }
+telegram_app.command('take', withAccessMiddleware('snipe'), async (ctx) => {
     if (ctx.args.length < 3) {
         return await ctx.reply('/take {address} {price} {count}')
     }
@@ -514,13 +506,7 @@ telegram_app.command('take', async (ctx) => {
     });
 })
 
-telegram_app.command('collect', async (ctx) => {
-    /**@type {User} */
-    const user = ctx.state.user;
-    const hasAccess = checkAccess(user, 'snipe');
-    if (!hasAccess) {
-        return await ctx.reply("ERR_NO_ACCESS")
-    }
+telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
     if (ctx.args.length < 1) return await ctx.reply('Missed target address');
     const targetAddr = Address.parse(ctx.args[0]);
     deletePixelsByAddress(targetAddr);
