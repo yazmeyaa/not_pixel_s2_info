@@ -308,11 +308,11 @@ telegram_app.command('snipe_xlsx', async (ctx) => {
 });
 
 telegram_app.command('add_access', async (ctx) => {
-    // /**@type {User} */
-    // const user = ctx.state.user
-    // if (!checkAccess(user, 'access_management')) {
-    //     return await ctx.reply("ERR_NO_ACCESS");
-    // }
+    /**@type {User} */
+    const user = ctx.state.user
+    if (!checkAccess(user, 'access_management')) {
+        return await ctx.reply("ERR_NO_ACCESS");
+    }
     const target = ctx.message.reply_to_message.from.id;
     if (ctx.args.length < 1) {
         return await ctx.reply('missed ACCESS argument');
