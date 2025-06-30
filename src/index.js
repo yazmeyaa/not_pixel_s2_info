@@ -408,10 +408,12 @@ async function collectNfts(targetAddr, chatId) {
     };
     updateProgress();
 
+    const PAGE_LIMIT = 100; // Уменьшаем лимит
+
     while (true) {
         const nfts = await ta.accounts.getAccountNftItems(targetAddr, {
             collection: collectionAddr,
-            limit: 1000,
+            limit: PAGE_LIMIT,
             offset
         });
 
@@ -440,7 +442,7 @@ async function collectNfts(targetAddr, chatId) {
             }));
         }
 
-        offset += 1000;
+        offset += PAGE_LIMIT;
     }
 
     stopLogging = true;
