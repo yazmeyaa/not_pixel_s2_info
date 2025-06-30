@@ -491,6 +491,69 @@ telegram_app.command('take', withAccessMiddleware('snipe'), async (ctx) => {
     });
 })
 
+let activeCollectProcesses = 0;
+const pendingConfirmations = new Map();
+
+telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
+    if (ctx.args.length < 1) return await ctx.reply('Target address is missing');
+    const targetAddr = Address.parse(ctx.args[0]);
+
+    if (activeCollectProcesses > 0) {
+        const message = await ctx.reply(
+            `⚠️ There are already ${activeCollectProcesses} active processes. Are you sure you want to start another one?`,
+            {
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: "✅ Yes, proceed", callback_data: `confirm_collect:${ctx.chat.id}:${ctx.args[0]}` },
+                        { text: "❌ Cancel", callback_data: `cancel_collect:${ctx.chat.id}` }
+                    ]]
+                }
+            }
+        );
+        pendingConfirmations.set(ctx.chat.id, { ctx, targetAddr });
+        return;
+    }
+
+    await startCollect(targetAddr, ctx);
+});
+
+async function startCollect(targetAddr, ctx) {
+    activeCollectProcesses++;
+    deletePixelsByAddress(targetAddr);
+
+    await Promise.all([
+        ctx.react?.('👍'),
+        ctx.reply?.(`Started processing wallet ${targetAddr.toFriendly()}...`)
+    ]);
+
+    setImmediate(() => collectNfts(targetAddr, ctx.chat.id)
+        .catch(err => logError('collect', err))
+        .finally(() => {
+            activeCollectProcesses--;
+        }));
+}
+
+telegram_app.on('callback_query', async (ctx) => {
+    const data = ctx.callbackQuery.data;
+    const [action, chatIdStr, addrStr] = data.split(':');
+    const chatId = parseInt(chatIdStr);
+
+    if (action === 'confirm_collect') {
+        const pending = pendingConfirmations.get(chatId);
+        if (!pending) return await ctx.answerCbQuery("Confirmation expired.");
+        await ctx.editMessageText(`✅ Collection confirmed for ${addrStr}`);
+        pendingConfirmations.delete(chatId);
+        await startCollect(pending.targetAddr, pending.ctx);
+    }
+
+    if (action === 'cancel_collect') {
+        pendingConfirmations.delete(chatId);
+        await ctx.editMessageText("❌ Collection canceled.");
+    }
+
+    await ctx.answerCbQuery();
+});
+
 telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
     if (ctx.args.length < 1) return await ctx.reply('Missed target address');
     const targetAddr = Address.parse(ctx.args[0]);
