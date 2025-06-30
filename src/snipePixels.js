@@ -77,6 +77,30 @@ export function saveSnipePixel(targetAddr, nft, x, y, price) {
     })
 }
 
+
+const buffer = [];
+const FLUSH_INTERVAL_MS = 100;
+
+export function queueSavePixel(...args) {
+    buffer.push(args);
+}
+
+setInterval(() => {
+    if (buffer.length === 0) return;
+
+    const batch = buffer.splice(0, buffer.length);
+    try {
+        const tx = db.transaction(() => {
+            for (const args of batch) {
+                insertPixelStmt.run(...args);
+            }
+        });
+        tx();
+    } catch (err) {
+        console.error('DB write failed', err);
+    }
+}, FLUSH_INTERVAL_MS);
+
 /**
  * 
  * @param {import('@ton/core').Address} targetAddr 

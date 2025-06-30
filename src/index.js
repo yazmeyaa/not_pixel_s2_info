@@ -499,18 +499,20 @@ telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
     const targetAddr = Address.parse(ctx.args[0]);
 
     if (activeCollectProcesses > 0) {
-        const message = await ctx.reply(
+        // Сохраняем в Map по chatId
+        pendingConfirmations.set(ctx.chat.id, { ctx, targetAddr });
+
+        await ctx.reply(
             `⚠️ There are already ${activeCollectProcesses} active processes. Are you sure you want to start another one?`,
             {
                 reply_markup: {
                     inline_keyboard: [[
-                        { text: "✅ Yes, proceed", callback_data: `confirm_collect:${ctx.chat.id}:${ctx.args[0]}` },
-                        { text: "❌ Cancel", callback_data: `cancel_collect:${ctx.chat.id}` }
+                        { text: "Yes, proceed", callback_data: `confirm_collect:${ctx.chat.id}` },
+                        { text: "Cancel", callback_data: `cancel_collect:${ctx.chat.id}` }
                     ]]
                 }
             }
         );
-        pendingConfirmations.set(ctx.chat.id, { ctx, targetAddr });
         return;
     }
 
@@ -523,7 +525,7 @@ async function startCollect(targetAddr, ctx) {
 
     await Promise.all([
         ctx.react?.('👍'),
-        ctx.reply?.(`Started processing wallet ${targetAddr.toFriendly()}...`)
+        ctx.reply?.(`Started processing wallet ${targetAddr.toString()}...`)
     ]);
 
     setImmediate(() => collectNfts(targetAddr, ctx.chat.id)
@@ -535,14 +537,20 @@ async function startCollect(targetAddr, ctx) {
 
 telegram_app.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data;
-    const [action, chatIdStr, addrStr] = data.split(':');
+    const [action, chatIdStr] = data.split(':');
     const chatId = parseInt(chatIdStr);
 
+    const pending = pendingConfirmations.get(chatId);
+
     if (action === 'confirm_collect') {
-        const pending = pendingConfirmations.get(chatId);
-        if (!pending) return await ctx.answerCbQuery("Confirmation expired.");
-        await ctx.editMessageText(`✅ Collection confirmed for ${addrStr}`);
+        if (!pending) {
+            await ctx.answerCbQuery("Confirmation expired.");
+            return;
+        }
+
+        await ctx.editMessageText(`✅ Collection confirmed for ${pending.targetAddr.toString()}`);
         pendingConfirmations.delete(chatId);
+
         await startCollect(pending.targetAddr, pending.ctx);
     }
 
@@ -553,6 +561,7 @@ telegram_app.on('callback_query', async (ctx) => {
 
     await ctx.answerCbQuery();
 });
+
 
 telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
     if (ctx.args.length < 1) return await ctx.reply('Missed target address');
