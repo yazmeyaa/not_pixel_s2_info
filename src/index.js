@@ -1,13 +1,14 @@
 import { Telegraf } from 'telegraf';
-import { TonApiClient } from '@ton-api/client';
 import { Address, fromNano } from '@ton/core';
 import { db } from './db.js'
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import { saveSnipePixel, getSnipePixelsByPrice, deletePixelsByAddress, getSnipeAllPixels, getPixelsByPriceAndLock, countTargetPrices } from './snipePixels.js';
-import Bottleneck from 'bottleneck';
 import { utils, write } from 'xlsx'
 import { addUser, addUserAccess, checkAccess, getUserByTelegramID, User } from './user.js';
 import rateLimit from 'telegraf-ratelimit'
+import { tonApiClient } from './tonapi.js'
+import { appConfig } from './config.js';
+
 
 // --- Global Error Handling ---
 function logError(tag, error, extra = {}) {
@@ -124,18 +125,6 @@ const getSeconds = (s) => 1000 * s;
 const getMinutes = (m) => getSeconds(60) * m;
 const getHours = (h) => getMinutes(60) * h;
 
-const RPS = Number.parseInt(process.env.TONAPI_RPS) ?? 10;
-const minTime = (1000 / RPS) + 5;
-
-const limiter = new Bottleneck({ minTime: minTime, maxConcurrent: 1 });
-const limitedFetch = limiter.wrap(fetch);
-
-const ta = new TonApiClient({
-    baseUrl: 'https://tonapi.io',
-    apiKey: 'AFRANRCCXL2DBDIAAAAFEVPZWRHEDNYD43O2J43MNTSEC7XDP44AIWH53JQGVPBQEMRCS7I',
-    fetch: limitedFetch,
-});
-
 /**
  * 
  * @param {string} access 
@@ -178,8 +167,8 @@ const getTokenStats = createCache(async () => {
 }, 2000);
 
 // --- Telegram bot ---
-const telegram_app = new Telegraf(process.env.BOT_TOKEN);
-telegram_app.catch((err, ctx) => logError('telegraf', err));
+const telegram_app = new Telegraf(appConfig.telegram.botToken);
+telegram_app.catch((err) => logError('telegraf', err));
 
 const bankSnapshots = [];
 
@@ -386,66 +375,60 @@ function formatDuration(ms) {
 
 
 const NOT_PIXEL_JETTON_ADDRESS = Address.parse('EQB420yQsZobGcy0VYDfSKHpG2QQlw-j1f_tPu1J488I__PX');
+const NOT_PIXEL_NFT_COLLECTION_ADDRESS = Address.parse('EQDxPnc-hOZTW5pxFFt56pny-W3UuEs7ktzf-tAGNCkxtOl1');
 
 async function collectNfts(targetAddr, chatId) {
     const startTime = Date.now();
     let offset = 0;
     let savedCount = 0;
-    let stopLogging = false;
 
-    const collectionAddr = Address.parse('EQDxPnc-hOZTW5pxFFt56pny-W3UuEs7ktzf-tAGNCkxtOl1');
-
-    const progressMsg = await telegram_app.telegram.sendMessage(chatId, `Saved 0 pixels...`);
-    const messageId = progressMsg.message_id;
-
-    const updateProgress = async () => {
-        while (!stopLogging) {
-            await new Promise(res => setTimeout(res, 3000));
-            try {
-                await telegram_app.telegram.editMessageText(chatId, messageId, undefined, `Saved ${savedCount} pixels...`);
-            } catch (_) { }
-        }
-    };
-    updateProgress();
-
-    const PAGE_LIMIT = 100; // Уменьшаем лимит
+    const PAGE_LIMIT = 100;
 
     while (true) {
-        const nfts = await ta.accounts.getAccountNftItems(targetAddr, {
-            collection: collectionAddr,
-            limit: PAGE_LIMIT,
-            offset
-        });
+        try {
+            const nfts = await tonApiClient.accounts.getAccountNftItems(targetAddr, {
+                collection: NOT_PIXEL_NFT_COLLECTION_ADDRESS,
+                limit: PAGE_LIMIT,
+                offset
+            });
 
-        if (nfts.nftItems.length === 0) break;
+            if (nfts.nftItems.length === 0) break;
 
-        for (let i = 0; i < nfts.nftItems.length; i += 10) {
-            const batch = nfts.nftItems.slice(i, i + 10);
-            await Promise.all(batch.map(async (nft) => {
-                const attrs = nft.metadata?.attributes || [];
-                const x = attrs.find(attr => attr.trait_type === 'X')?.value;
-                const y = attrs.find(attr => attr.trait_type === 'Y')?.value;
+            await Promise.all(nfts.nftItems.map(async (nft) => {
+                try {
+                    const attrs = nft.metadata?.attributes || [];
+                    const x = attrs.find(attr => attr.trait_type === 'X')?.value;
+                    const y = attrs.find(attr => attr.trait_type === 'Y')?.value;
 
-                if (x && y) {
-                    const balances = await ta.accounts.getAccountJettonsBalances(nft.address);
-                    let pxBalance = balances.balances.find(b => b.jetton.address.equals(NOT_PIXEL_JETTON_ADDRESS))?.balance || BigInt(1e9);
+                    if (x && y) {
+                        const balances = await tonApiClient.accounts.getAccountJettonsBalances(nft.address);
+                        const px = balances?.balances?.find(b => b.jetton.address.equals(NOT_PIXEL_JETTON_ADDRESS));
+                        let pxBalance = px?.balance ?? BigInt(1e9);
 
-                    if (pxBalance === BigInt(1e9)) {
-                        pxBalance = 2e9;
-                    } else {
-                        pxBalance = 4n * (pxBalance + BigInt(0.5e9));
+                        if (pxBalance === BigInt(1e9)) {
+                            pxBalance = BigInt(2e9);
+                        } else {
+                            pxBalance = 4n * (pxBalance + BigInt(0.5e9));
+                        }
+
+                        saveSnipePixel(targetAddr, nft.address, x, y, pxBalance);
+                        savedCount++;
                     }
-
-                    saveSnipePixel(targetAddr, nft.address, x, y, pxBalance);
-                    savedCount++;
+                } catch (err) {
+                    logError('collectNfts.item', err);
                 }
             }));
+            const now = new Date();
+            console.log(`[${now.toLocaleTimeString()}]: Processed ${nfts.nftItems.length} pixels. Go next.`);
+
+            offset += PAGE_LIMIT;
+        } catch (error) {
+            logError('collectNfts', error);
+            telegram_app.telegram.sendMessage(chatId, `Failed to collect user NFTS.`);
+            telegram_app.telegram.sendMessage("279603779", error.message);
+            break;
         }
-
-        offset += PAGE_LIMIT;
     }
-
-    stopLogging = true;
 
     const durationMs = Date.now() - startTime;
     const durationStr = formatDuration(durationMs);
@@ -515,7 +498,7 @@ telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
 
     await Promise.all([
         ctx.react('👍'),
-        ctx.reply('Start processing wallet...')
+        ctx.reply(`Start processing wallet ${ctx.args[0]}...`)
     ]);
 
     setImmediate(() => collectNfts(targetAddr, ctx.chat.id).catch(err => {

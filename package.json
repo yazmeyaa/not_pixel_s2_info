@@ -2,6 +2,9 @@
   "name": "not_pixel_s2_info",
   "type": "module",
   "packageManager": "yarn@4.6.0",
+  "scripts": {
+    "start": "node src/index.js"
+  },
   "dependencies": {
     "@orbs-network/ton-access": "^2.3.3",
     "@ton-api/client": "^0.4.0",
@@ -13,6 +16,7 @@
     "canvas": "^3.1.1",
     "chart.js": "^4.5.0",
     "chartjs-node-canvas": "^5.0.0",
+    "dotenv": "^17.0.0",
     "eiows": "^8.2.0",
     "express": "^5.1.0",
     "install": "^0.13.0",
