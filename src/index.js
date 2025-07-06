@@ -166,6 +166,17 @@ const getTokenStats = createCache(async () => {
     return await res.json();
 }, 2000);
 
+const getAvailablePixelsCount = createCache(async () => {
+    const response = await fetch('https://api.jsonbin.io/v3/b/686856ff8a456b7966bb7eed/latest', {
+        headers: new Headers({
+            "X-Access-Key": appConfig.jsonBin.accessKey,
+        })
+    })
+    /**@type {{record: Record<string, number>}} */
+    const json = await response.json();
+    return json.record;
+}, 1000 * 60 * 60 * 3)
+
 // --- Telegram bot ---
 const telegram_app = new Telegraf(appConfig.telegram.botToken);
 telegram_app.catch((err) => logError('telegraf', err));
@@ -226,10 +237,11 @@ telegram_app.use(rateLimit(limitOptions))
 
 // --- Commands ---
 telegram_app.command('info', ctx => catchError('tg:info', async () => {
-    const [bankInfo, currentUsers, tokenStats] = await Promise.all([
+    const [bankInfo, currentUsers, tokenStats, availablePixels] = await Promise.all([
         getBankInfo(),
         getOnlineUsers(),
         getTokenStats(),
+        getAvailablePixelsCount(),
     ]);
 
     const deltas = [
@@ -245,10 +257,16 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
     });
 
     const toBurn = ((bankInfo - 1_000_000) / 2);
+    const availablePixelsText = Object.entries(availablePixels).map(([key, value]) => {
+        return `${key} $PX - ${value} pcs.`
+    }).join('\n');
+
     await ctx.react('👍');
     await ctx.reply([
         `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)`,
         `📊 Bank change:\n${deltaLines.join('\n')}\n`,
+        availablePixelsText,
+        '\n',
         `🔥Pixels to burn ${toBurn.toLocaleString('en-US')} $PX🔥`,
         `🟢 Online users: ${currentUsers.toLocaleString('en-US')}`
     ].join('\n'));

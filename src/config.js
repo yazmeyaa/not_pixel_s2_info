@@ -25,5 +25,8 @@ export const appConfig = {
     },
     telegram: {
         botToken: getEnv("BOT_TOKEN")
+    },
+    jsonBin: {
+        accessKey: getEnv("JSONBIN_ACCESS_KEY")
     }
 }
