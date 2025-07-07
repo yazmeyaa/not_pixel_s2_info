@@ -142,18 +142,7 @@ const withAccessMiddleware = (access) => {
     }
 }
 
-// --- Data fetching with cache ---й
-function createCache(fn, ttlMs) {
-    let cache = null;
-    let cacheTime = 0;
-    return async () => {
-        const now = Date.now();
-        if (cache && now - cacheTime < ttlMs) return cache;
-        cache = await fn();
-        cacheTime = now;
-        return cache;
-    };
-}
+
 
 // --- Telegram bot ---
 const telegram_app = new Telegraf(appConfig.telegram.botToken);
@@ -241,12 +230,12 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
 
     await ctx.react('👍');
     await ctx.reply([
-        `$PX price: $${tokenStats.price.toFixed(3)}`,
+        `💵 Price PX/USDT: $${tokenStats.price.toFixed(3)}`,
         `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)`,
         `📊 Bank change:\n${deltaLines.join('\n')}\n`,
         availablePixelsText,
         '\n',
-        `🔥Pixels to burn ${toBurn.toLocaleString('en-US')} $PX🔥`,
+        `🔥 Pixels to burn ${toBurn.toLocaleString('en-US')} $PX🔥`,
         `🟢 Online users: ${currentUsers.toLocaleString('en-US')}`
     ].join('\n'));
 }));

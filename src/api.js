@@ -1,5 +1,17 @@
 import { appConfig } from "./config.js";
 
+function createCache(fn, ttlMs) {
+    let cache = null;
+    let cacheTime = 0;
+    return async () => {
+        const now = Date.now();
+        if (cache && now - cacheTime < ttlMs) return cache;
+        cache = await fn();
+        cacheTime = now;
+        return cache;
+    };
+}
+
 export const getOnlineUsers = createCache(async () => {
     const res = await fetch('https://notpixel.org/api/v1/history/online/stats');
     return (await res.json()).current_visitors;
