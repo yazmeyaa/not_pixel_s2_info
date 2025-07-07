@@ -8,6 +8,7 @@ import { addUser, addUserAccess, checkAccess, getUserByTelegramID, User } from '
 import rateLimit from 'telegraf-ratelimit'
 import { tonApiClient } from './tonapi.js'
 import { appConfig } from './config.js';
+import { getAvailablePixelsCount, getBankInfo, getOnlineUsers, getTokenStats } from './api.js'
 
 
 // --- Global Error Handling ---
@@ -153,29 +154,6 @@ function createCache(fn, ttlMs) {
         return cache;
     };
 }
-const getOnlineUsers = createCache(async () => {
-    const res = await fetch('https://notpixel.org/api/v1/history/online/stats');
-    return (await res.json()).current_visitors;
-}, 1000);
-const getBankInfo = createCache(async () => {
-    const res = await fetch('https://notpixel.org/api/v1/battle-canvas/info');
-    return (await res.json()).rewardBank;
-}, 2000);
-const getTokenStats = createCache(async () => {
-    const res = await fetch('https://notpixel.org/api/v1/history/px/stats');
-    return await res.json();
-}, 2000);
-
-const getAvailablePixelsCount = createCache(async () => {
-    const response = await fetch('https://api.jsonbin.io/v3/b/686856ff8a456b7966bb7eed/latest', {
-        headers: new Headers({
-            "X-Access-Key": appConfig.jsonBin.accessKey,
-        })
-    })
-    /**@type {{record: Record<string, number>}} */
-    const json = await response.json();
-    return json.record;
-}, 1000 * 60 * 60 * 3)
 
 // --- Telegram bot ---
 const telegram_app = new Telegraf(appConfig.telegram.botToken);
@@ -263,6 +241,7 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
 
     await ctx.react('👍');
     await ctx.reply([
+        `$PX price: $${tokenStats.price.toFixed(3)}`,
         `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)`,
         `📊 Bank change:\n${deltaLines.join('\n')}\n`,
         availablePixelsText,
