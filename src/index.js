@@ -215,21 +215,57 @@ Available commands:
     ctx.reply(text);
 })
 
+const pixelSnapshots = [];
+let currentPixelCache = {};
+
+function updatePixelSnapshots(availablePixels) {
+    const now = Date.now();
+    currentPixelCache = { ...availablePixels };
+    pixelSnapshots.push({ timestamp: now, pixels: { ...availablePixels } });
+
+    const retentionWindow = 90 * 60 * 1000;
+    const cutoff = now - retentionWindow;
+    while (pixelSnapshots.length > 0 && pixelSnapshots[0].timestamp < cutoff) {
+        pixelSnapshots.shift();
+    }
+}
+
+function getPixelDelta(priceKey) {
+    const targetTs = Date.now() - 60 * 60 * 1000;
+    const snapshot = [...pixelSnapshots]
+        .reverse()
+        .find(snap => snap.timestamp <= targetTs);
+
+    if (!snapshot) return null;
+
+    const currentPixels = currentPixelCache[priceKey] || 0;
+    const pastPixels = snapshot.pixels[priceKey] || 0;
+    const delta = currentPixels - pastPixels;
+    const percent = pastPixels > 0 ? (delta / pastPixels) * 100 : 0;
+    return { delta, percent };
+}
+
 telegram_app.command('pixels_stats', async (ctx) => {
     const availablePixels = await getAvailablePixelsCount();
+    updatePixelSnapshots(availablePixels);
 
     const availablePixelsText = Object.entries(availablePixels).map(([key, value]) => {
-        return `${key} $PX ~${value} pcs.`
+        const delta = getPixelDelta(key);
+        let deltaText = '';
+        if (delta) {
+            deltaText = ` ${delta.delta > 0 ? "+" : delta.delta < 0 ? "-" : ""}${delta.delta.toLocaleString('en-US')} (${delta.percent.toFixed(2)}%)`;
+        }
+        return `${key} $PX ~${value} pcs.${deltaText}`;
     }).join('\n');
 
     await Promise.all([
         ctx.react('👍'),
         ctx.reply([
-            "Available pixels:\n",
+            "Available pixels (change over last 1h):\n",
             availablePixelsText,
         ].join('\n'))
-    ])
-})
+    ]);
+});
 
 // --- Commands ---
 telegram_app.command('info', ctx => catchError('tg:info', async () => {
