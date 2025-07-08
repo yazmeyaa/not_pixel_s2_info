@@ -202,13 +202,41 @@ const limitOptions = {
 }
 telegram_app.use(rateLimit(limitOptions))
 
+telegram_app.start((ctx) => {
+    const text = `👋 Welcome to the Not Pixel S2 info bot.
+
+This bot helps you track the current state of the NotPixel game economy, analyze $PX token metrics.
+
+Available commands:
+/info – Get current token price, bank size, online players and recent $PX flow.
+/stats – Show charts with live data on bank rewards and online user count.
+/pixels_stats – View available pixels by price tiers.`
+
+    ctx.reply(text);
+})
+
+telegram_app.command('pixels_stats', async (ctx) => {
+    const availablePixels = await getAvailablePixelsCount();
+
+    const availablePixelsText = Object.entries(availablePixels).map(([key, value]) => {
+        return `${key} $PX ~${value} pcs.`
+    }).join('\n');
+
+    await Promise.all([
+        ctx.react('👍'),
+        ctx.reply([
+            "Available pixels:\n",
+            availablePixelsText,
+        ].join('\n'))
+    ])
+})
+
 // --- Commands ---
 telegram_app.command('info', ctx => catchError('tg:info', async () => {
-    const [bankInfo, currentUsers, tokenStats, availablePixels] = await Promise.all([
+    const [bankInfo, currentUsers, tokenStats] = await Promise.all([
         getBankInfo(),
         getOnlineUsers(),
         getTokenStats(),
-        getAvailablePixelsCount(),
     ]);
 
     const deltas = [
@@ -224,17 +252,12 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
     });
 
     const toBurn = ((bankInfo - 1_000_000) / 2);
-    const availablePixelsText = Object.entries(availablePixels).map(([key, value]) => {
-        return `${key} $PX - ${value} pcs.`
-    }).join('\n');
 
     await ctx.react('👍');
     await ctx.reply([
         `💵 Price PX/USDT: $${tokenStats.price.toFixed(3)}`,
         `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)`,
         `📊 Bank change:\n${deltaLines.join('\n')}\n`,
-        availablePixelsText,
-        '\n',
         `🔥 Pixels to burn ${toBurn.toLocaleString('en-US')} $PX🔥`,
         `🟢 Online users: ${currentUsers.toLocaleString('en-US')}`
     ].join('\n'));
