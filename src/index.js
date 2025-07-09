@@ -28,9 +28,9 @@ process.on('unhandledRejection', (reason) => logError('unhandledRejection', reas
 process.on('uncaughtException', (err) => logError('uncaughtException', err));
 
 // --- Globals ---
-globalThis.chartBankReward = null;
-globalThis.chartOnline = null;
-globalThis.chartMintedPixels = null;
+globalThis.chartBankReward = { buffer: null, fileId: null, wasFileUploaded: false };
+globalThis.chartOnline = { buffer: null, fileId: null, wasFileUploaded: false };
+globalThis.chartMintedPixels = { buffer: null, fileId: null, wasFileUploaded: false };
 
 // --- Chart rendering ---
 const width = 800;
@@ -82,16 +82,18 @@ async function renderMetricsCharts(metrics) {
             },
         };
     };
-    globalThis.chartBankReward = await canvasRenderService.renderToBuffer({
+    globalThis.chartBankReward.buffer = await canvasRenderService.renderToBuffer({
         type: 'line',
         data: { labels, datasets: [datasets.bank_reward] },
         options: buildOptions('Bank Reward ($PX)', values.bank_reward),
     });
-    globalThis.chartOnline = await canvasRenderService.renderToBuffer({
+    globalThis.chartOnline.buffer = await canvasRenderService.renderToBuffer({
         type: 'line',
         data: { labels, datasets: [datasets.current_online] },
         options: buildOptions('Online Users', values.current_online),
     });
+    globalThis.chartBankReward.wasFileUploaded = false;
+    globalThis.chartOnline.wasFileUploaded = false;
 }
 
 // --- DB ---
@@ -300,10 +302,39 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
 }));
 
 telegram_app.command('stats', ctx => catchError('tg:stats', async () => {
-    await ctx.replyWithMediaGroup([
-        { type: 'photo', media: { source: globalThis.chartBankReward }, caption: '🏦 Bank Reward' },
-        { type: 'photo', media: { source: globalThis.chartOnline }, caption: '🟢 Online Users' },
-    ]);
+    if (!globalThis.chartBankReward.wasFileUploaded || !global.chartOnline.wasFileUploaded) {
+        const [bankMedia, onlineMedia] = await ctx.replyWithMediaGroup([
+            { type: 'photo', media: { source: globalThis.chartBankReward.buffer }, caption: '🏦 Bank Reward' },
+            { type: 'photo', media: { source: globalThis.chartOnline.buffer }, caption: '🟢 Online Users' },
+        ])
+
+        if ('photo' in bankMedia) {
+            const fullsizePhoto = bankMedia.photo.find(photo => {
+                return photo.width === 800 && photo.height === 400;
+            })
+            if (!fullsizePhoto) return;
+            globalThis.chartBankReward.fileId = fullsizePhoto.file_id;
+            globalThis.chartBankReward.wasFileUploaded = true;
+        }
+
+        if ('photo' in onlineMedia) {
+            const fullsizePhoto = onlineMedia.photo.find(photo => {
+                return photo.width === 800 && photo.height === 400;
+            })
+            if (!fullsizePhoto) return;
+            globalThis.chartOnline.fileId = fullsizePhoto.file_id;
+            globalThis.chartOnline.wasFileUploaded = true;
+        }
+
+
+        return
+    }
+    else {
+        await ctx.replyWithMediaGroup([
+            { type: 'photo', media: globalThis.chartBankReward.fileId, caption: '🏦 Bank Reward' },
+            { type: 'photo', media: globalThis.chartOnline.fileId, caption: '🟢 Online Users' },
+        ]);
+    }
 }));
 
 telegram_app.command('snipe_xlsx', withAccessMiddleware('snipe'), async (ctx) => {
