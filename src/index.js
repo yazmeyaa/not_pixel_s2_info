@@ -8,7 +8,7 @@ import { addUser, addUserAccess, checkAccess, getUserByTelegramID, User } from '
 import rateLimit from 'telegraf-ratelimit'
 import { tonApiClient } from './tonapi.js'
 import { appConfig } from './config.js';
-import { getAvailablePixelsCount, getBankInfo, getOnlineUsers, getTokenStats } from './api.js'
+import { getAvailablePixelsCount, getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats } from './api.js'
 
 
 // --- Global Error Handling ---
@@ -31,6 +31,14 @@ process.on('uncaughtException', (err) => logError('uncaughtException', err));
 globalThis.chartBankReward = { buffer: null, fileId: null, wasFileUploaded: false };
 globalThis.chartOnline = { buffer: null, fileId: null, wasFileUploaded: false };
 globalThis.chartMintedPixels = { buffer: null, fileId: null, wasFileUploaded: false };
+
+/**
+ * @type {{prev: null | Record<string, number>, current: null | Record<string, number>}}
+ */
+globalThis.pixelsCount = {
+    prev: null,
+    current: null,
+}
 
 // --- Chart rendering ---
 const width = 800;
@@ -217,53 +225,27 @@ Available commands:
     ctx.reply(text);
 })
 
-const pixelSnapshots = [];
-let currentPixelCache = {};
-
-function updatePixelSnapshots(availablePixels) {
-    const now = Date.now();
-    currentPixelCache = { ...availablePixels };
-    pixelSnapshots.push({ timestamp: now, pixels: { ...availablePixels } });
-
-    const retentionWindow = 90 * 60 * 1000;
-    const cutoff = now - retentionWindow;
-    while (pixelSnapshots.length > 0 && pixelSnapshots[0].timestamp < cutoff) {
-        pixelSnapshots.shift();
-    }
-}
-
-function getPixelDelta(priceKey) {
-    const targetTs = Date.now() - 60 * 60 * 1000;
-    const snapshot = [...pixelSnapshots]
-        .reverse()
-        .find(snap => snap.timestamp <= targetTs);
-
-    if (!snapshot) return null;
-
-    const currentPixels = currentPixelCache[priceKey] || 0;
-    const pastPixels = snapshot.pixels[priceKey] || 0;
-    const delta = currentPixels - pastPixels;
-    const percent = pastPixels > 0 ? (delta / pastPixels) * 100 : 0;
-    return { delta, percent };
-}
 
 telegram_app.command('pixels_stats', async (ctx) => {
-    const availablePixels = await getAvailablePixelsCount();
-    updatePixelSnapshots(availablePixels);
+    const currentPixels = globalThis.pixelsCount.current;
+    if (!currentPixels) return;
+    const prev = globalThis.pixelsCount.prev;
 
-    const availablePixelsText = Object.entries(availablePixels).map(([key, value]) => {
-        const delta = getPixelDelta(key);
-        let deltaText = '';
-        if (delta) {
-            deltaText = ` ${delta.delta > 0 ? "+" : delta.delta < 0 ? "-" : ""}${delta.delta.toLocaleString('en-US')} (${delta.percent.toFixed(2)}%)`;
+    const availablePixelsText = Object.entries(currentPixels).map(([key, value]) => {
+        const txt = `${key} $PX ~${value} pcs.`;
+        if (prev !== null) {
+            const delta = currentPixels[key] - prev[key];
+            const deltaText = `[${delta > 0 ? `+${delta}` : delta}]`
+            return [txt, deltaText].join(' ')
         }
-        return `${key} $PX ~${value} pcs.${deltaText}`;
+
+        return txt;
     }).join('\n');
 
     await Promise.all([
         ctx.react('👍'),
         ctx.reply([
-            "Available pixels (change over last 1h):\n",
+            "Available pixels:\n",
             availablePixelsText,
         ].join('\n'))
     ]);
@@ -654,6 +636,11 @@ telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
     }));
 });
 
+setInterval(async () => {
+    const pixels = await getAvailablePixelsCountNoCache()
+    globalThis.pixelsCount.prev = globalThis.pixelsCount.current;
+    globalThis.pixelsCount.current = pixels;
+}, 1000 * 60 * 60 * 3)
 
 // --- Metrics Polling ---
 setInterval(() => catchError('metrics-collector', async () => {
@@ -671,10 +658,15 @@ setInterval(async () => {
 // --- Startup ---
 (async () => {
     await catchError('startup', async () => {
+        const pixels = await getAvailablePixelsCountNoCache();
+        globalThis.pixelsCount.current = pixels;
+
         const bankInfo = await getBankInfo()
         updateSnapshots(bankInfo);
+
         const metrics = getMetrics(new Date(Date.now() - getHours(24)), new Date());
         await renderMetricsCharts(metrics);
+
         telegram_app.launch();
     });
 })();

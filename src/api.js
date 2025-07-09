@@ -25,8 +25,11 @@ export const getTokenStats = createCache(async () => {
     return await res.json();
 }, 2000);
 
+
+const BIN_ID = '686856ff8a456b7966bb7eed'
+
 export const getAvailablePixelsCount = createCache(async () => {
-    const response = await fetch('https://api.jsonbin.io/v3/b/686856ff8a456b7966bb7eed/latest', {
+    const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}?meta=true`, {
         headers: new Headers({
             "X-Access-Key": appConfig.jsonBin.accessKey,
         })
@@ -35,3 +38,15 @@ export const getAvailablePixelsCount = createCache(async () => {
     const json = await response.json();
     return json.record;
 }, 1000 * 60 * 60 * 3)
+
+
+export const getAvailablePixelsCountNoCache = async () => {
+    const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}?meta=true`, {
+        headers: new Headers({
+            "X-Access-Key": appConfig.jsonBin.accessKey,
+        })
+    })
+    /**@type {{record: Record<string, number>}} */
+    const json = await response.json();
+    return json.record;
+}
