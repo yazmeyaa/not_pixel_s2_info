@@ -36,7 +36,9 @@ export const getAvailablePixelsCount = createCache(async () => {
     })
     /**@type {{record: Record<string, number>}} */
     const json = await response.json();
-    return json.record;
+    const uploadetAtHdrs = response.headers.get('date')
+    const uploadetAt = new Date(uploadetAtHdrs);
+    return { ...json.record, uploadetAt };
 }, 1000 * 60 * 60 * 3)
 
 
@@ -48,5 +50,7 @@ export const getAvailablePixelsCountNoCache = async () => {
     })
     /**@type {{record: Record<string, number>}} */
     const json = await response.json();
-    return json.record;
+    const uploadetAtHdrs = response.headers.get('date')
+    const uploadetAt = new Date(uploadetAtHdrs);
+    return { pixels: json.record, uploadetAt };
 }

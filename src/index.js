@@ -8,7 +8,7 @@ import { addUser, addUserAccess, checkAccess, getUserByTelegramID, User } from '
 import rateLimit from 'telegraf-ratelimit'
 import { tonApiClient } from './tonapi.js'
 import { appConfig } from './config.js';
-import { getAvailablePixelsCount, getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats } from './api.js'
+import { getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats } from './api.js'
 
 
 // --- Global Error Handling ---
@@ -33,11 +33,12 @@ globalThis.chartOnline = { buffer: null, fileId: null, wasFileUploaded: false };
 globalThis.chartMintedPixels = { buffer: null, fileId: null, wasFileUploaded: false };
 
 /**
- * @type {{prev: null | Record<string, number>, current: null | Record<string, number>}}
+ * @type {{prev: null | Record<string, number>, current: null | Record<string, number>, uploadetAt: Date | null}}
  */
 globalThis.pixelsCount = {
     prev: null,
     current: null,
+    uploadetAt: null
 }
 
 // --- Chart rendering ---
@@ -247,6 +248,8 @@ telegram_app.command('pixels_stats', async (ctx) => {
         ctx.reply([
             "Available pixels:\n",
             availablePixelsText,
+            '',
+            `Updated at: ${globalThis.pixelsCount.uploadetAt.toUTCString()}`
         ].join('\n'))
     ]);
 });
@@ -639,7 +642,8 @@ telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
 setInterval(async () => {
     const pixels = await getAvailablePixelsCountNoCache()
     globalThis.pixelsCount.prev = globalThis.pixelsCount.current;
-    globalThis.pixelsCount.current = pixels;
+    globalThis.pixelsCount.current = pixels.pixels;
+    globalThis.pixelsCount.uploadetAt = pixels.uploadetAt;
 }, 1000 * 60 * 60 * 3)
 
 // --- Metrics Polling ---
@@ -659,7 +663,8 @@ setInterval(async () => {
 (async () => {
     await catchError('startup', async () => {
         const pixels = await getAvailablePixelsCountNoCache();
-        globalThis.pixelsCount.current = pixels;
+        globalThis.pixelsCount.current = pixels.pixels;
+        globalThis.pixelsCount.uploadetAt = pixels.uploadetAt;
 
         const bankInfo = await getBankInfo()
         updateSnapshots(bankInfo);
