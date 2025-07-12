@@ -644,7 +644,7 @@ setInterval(async () => {
     globalThis.pixelsCount.prev = globalThis.pixelsCount.current;
     globalThis.pixelsCount.current = pixels.pixels;
     globalThis.pixelsCount.uploadetAt = pixels.uploadetAt;
-}, 1000 * 60 * 60 * 3)
+}, 1000 * 60 * 60 * 1)
 
 // --- Metrics Polling ---
 setInterval(() => catchError('metrics-collector', async () => {
