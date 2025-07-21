@@ -10,7 +10,7 @@ import { tonApiClient } from './tonapi.js'
 import { appConfig } from './config.js';
 import { getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats, getTournamentEndState } from './api.js'
 import cron from 'node-cron';
-import { addNotificationReciever, getNotificationChats } from './notifications.js';
+import { addNotificationReciever, getNotificationChats, removeNotificationReciever } from './notifications.js';
 
 
 // --- Global Error Handling ---
@@ -225,7 +225,8 @@ Available commands:
 /stats – Show charts with live data on bank rewards and online user count.
 /pixels_stats – View available pixels by price tiers.
 /tournament - Get information about torunament end
-/enable_notifications - Enable notifications anout near tournament end. Notifications will be sent 10, 5 and 1 minute before the end of the tournament. Notifications will only be sent if the tournament extension conditions have not been met.`;
+/enable_notifications - Enable notifications anout near tournament end. Notifications will be sent 10, 5 and 1 minute before the end of the tournament. Notifications will only be sent if the tournament extension conditions have not been met.
+/disable_notifications - Disable notifications about tournament end.`;
 
     ctx.reply(text);
 })
@@ -671,7 +672,14 @@ telegram_app.command('enable_notifications', async (ctx) => {
     const chatId = ctx.chat.id
     addNotificationReciever(chatId);
     ctx.react('👍')
-    ctx.reply('Notifications enabled.')
+    ctx.reply('Notifications enabled for this chat.')
+})
+
+telegram_app.command('disable_notifications', (ctx) => {
+    const chatId = ctx.chat.id
+    removeNotificationReciever(chatId)
+    ctx.react('👍')
+    ctx.reply('Notifications disabled for this chat.')
 })
 
 const cronExpr = '50,55,59 * * * *'
