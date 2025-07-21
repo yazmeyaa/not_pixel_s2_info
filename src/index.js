@@ -223,7 +223,9 @@ This bot helps you track the current state of the NotPixel game economy, analyze
 Available commands:
 /info – Get current token price, bank size, online players and recent $PX flow.
 /stats – Show charts with live data on bank rewards and online user count.
-/pixels_stats – View available pixels by price tiers.`
+/pixels_stats – View available pixels by price tiers.
+/tournament - Get information about torunament end
+/enable_notifications - Enable notifications anout near tournament end. Notifications will be sent 10, 5 and 1 minute before the end of the tournament. Notifications will only be sent if the tournament extension conditions have not been met.`;
 
     ctx.reply(text);
 })
