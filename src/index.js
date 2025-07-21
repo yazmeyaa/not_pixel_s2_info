@@ -396,8 +396,10 @@ telegram_app.command('tournament', async (ctx) => {
     const isTournamentSafe = state.doneTxCount >= state.needTxCount;
 
     const tournamentStateText = !isTournamentSafe ? "⛔️ Tournament may ends now!" : "✅ Tournament is safe.";
-    const seconds = state.timeTo / 1000;
-    const minutes = Math.floor(seconds / 60);
+    const ms = state.timeTo
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
     const strings = [
         tournamentStateText,
         '',
@@ -408,7 +410,7 @@ telegram_app.command('tournament', async (ctx) => {
         strings.push(`Need ${state.needTxCount - state.doneTxCount}`)
     }
 
-    strings.push(`Left ${Math.floor(minutes)}:${Math.floor(seconds)}`)
+    strings.push(`Left ${minutes}:${seconds}`)
 
     return await ctx.reply(strings.join('\n'))
 })
