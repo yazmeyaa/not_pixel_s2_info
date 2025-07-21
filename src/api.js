@@ -20,6 +20,12 @@ export const getBankInfo = createCache(async () => {
     const res = await fetch('https://notpixel.org/api/v1/battle-canvas/info');
     return (await res.json()).rewardBank;
 }, 2000);
+
+export const getTournamentEndState = createCache(async () => {
+    const res = await fetch('https://notpixel.org/api/v1/battle-canvas/stop-info');
+    return (await res.json());
+}, 2000);
+
 export const getTokenStats = createCache(async () => {
     const res = await fetch('https://notpixel.org/api/v1/history/px/stats');
     return await res.json();

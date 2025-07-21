@@ -8,7 +8,7 @@ import { addUser, addUserAccess, checkAccess, getUserByTelegramID, User } from '
 import rateLimit from 'telegraf-ratelimit'
 import { tonApiClient } from './tonapi.js'
 import { appConfig } from './config.js';
-import { getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats } from './api.js'
+import { getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats, getTournamentEndState } from './api.js'
 
 
 // --- Global Error Handling ---
@@ -391,6 +391,25 @@ telegram_app.command('add_access', withAccessMiddleware('access_management'), as
     return await ctx.reply('OK!')
 })
 
+telegram_app.command('tournament', async (ctx) => {
+    const state = await getTournamentEndState();
+    const isTournamentSafe = state.doneTxCount >= state.needTxCount;
+
+    const tournamentStateText = !isTournamentSafe ? "✅ Tournament may ends now!" : "⛔️ Tournament is safe.";
+
+    const strings = [
+        tournamentStateText,
+        '',
+        `Transactions: ${state.doneTxCount} / ${state.needTxCount}`,
+    ];
+    
+    if(!isTournamentSafe) {
+        strings.push(`Need ${state.needTxCount - state.doneTxCount}`)
+    }
+
+    return await ctx.reply(strings.join('\n'))
+})
+
 telegram_app.command('snipe', withAccessMiddleware('snipe'), async (ctx) => {
     if (ctx.args.length < 3) return await ctx.reply('Wrong command usage\n/snipe {address} {price} {page} {page_size}');
     const targetAddress = Address.parse(ctx.args[0]);
@@ -662,9 +681,14 @@ setInterval(async () => {
 // --- Startup ---
 (async () => {
     await catchError('startup', async () => {
-        const pixels = await getAvailablePixelsCountNoCache();
-        globalThis.pixelsCount.current = pixels.pixels;
-        globalThis.pixelsCount.uploadetAt = pixels.uploadetAt;
+        try {
+            const pixels = await getAvailablePixelsCountNoCache();
+            globalThis.pixelsCount.current = pixels.pixels;
+            globalThis.pixelsCount.uploadetAt = pixels.uploadetAt;
+        }
+        catch (error) {
+            console.error(error)
+        }
 
         const bankInfo = await getBankInfo()
         updateSnapshots(bankInfo);
