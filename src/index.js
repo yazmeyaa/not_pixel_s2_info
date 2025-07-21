@@ -9,6 +9,8 @@ import rateLimit from 'telegraf-ratelimit'
 import { tonApiClient } from './tonapi.js'
 import { appConfig } from './config.js';
 import { getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats, getTournamentEndState } from './api.js'
+import cron from 'node-cron';
+import { addNotificationReciever, getNotificationChats } from './notifications.js';
 
 
 // --- Global Error Handling ---
@@ -405,8 +407,8 @@ telegram_app.command('tournament', async (ctx) => {
         '',
         `Transactions: ${state.doneTxCount} / ${state.needTxCount}`,
     ];
-    
-    if(!isTournamentSafe) {
+
+    if (!isTournamentSafe) {
         strings.push(`Need ${state.needTxCount - state.doneTxCount}`)
     }
 
@@ -662,6 +664,31 @@ telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
         logError('collect', err);
     }));
 });
+
+telegram_app.command('enable_notifications', async (ctx) => {
+    const chatId = ctx.chat.id
+    addNotificationReciever(chatId);
+    ctx.react('👍')
+    ctx.reply('Notifications enabled.')
+})
+
+const cronExpr = '50,55,59 * * * *'
+cron.schedule(cronExpr, async () => {
+    const state = await getTournamentEndState();
+    state.needTxCount = 5555;
+    if (state.doneTxCount < state.needTxCount) {
+        const chats = getNotificationChats();
+        const ms = state.timeTo
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+
+        const promises = chats.map(chat => {
+            const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
+            return telegram_app.telegram.sendMessage(chat.chatId, text)
+        })
+        Promise.all(promises)
+    }
+})
 
 setInterval(async () => {
     const pixels = await getAvailablePixelsCountNoCache()
