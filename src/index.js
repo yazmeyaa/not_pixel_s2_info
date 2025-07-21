@@ -395,7 +395,7 @@ telegram_app.command('tournament', async (ctx) => {
     const state = await getTournamentEndState();
     const isTournamentSafe = state.doneTxCount >= state.needTxCount;
 
-    const tournamentStateText = !isTournamentSafe ? "✅ Tournament may ends now!" : "⛔️ Tournament is safe.";
+    const tournamentStateText = !isTournamentSafe ? "⛔️ Tournament may ends now!" : "✅ Tournament is safe.";
 
     const strings = [
         tournamentStateText,
