@@ -675,7 +675,6 @@ telegram_app.command('enable_notifications', async (ctx) => {
 const cronExpr = '50,55,59 * * * *'
 cron.schedule(cronExpr, async () => {
     const state = await getTournamentEndState();
-    state.needTxCount = 5555;
     if (state.doneTxCount < state.needTxCount) {
         const chats = getNotificationChats();
         const ms = state.timeTo
