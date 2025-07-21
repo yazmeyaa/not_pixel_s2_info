@@ -83,7 +83,7 @@ async function renderMetricsCharts(metrics) {
             responsive: false,
             plugins: { legend: { display: true }, title: { display: true, text: title } },
             scales: {
-                x: { ticks: { maxTicksLimit: 20 }, title: { display: true, text: 'Time' } },
+                x: { ticks: { maxTicksLimit: 20 }, title: { display: true, text: 'Time (UTC)' } },
                 y: {
                     beginAtZero: false,
                     suggestedMin: min - margin,
