@@ -408,7 +408,7 @@ telegram_app.command('tournament', async (ctx) => {
         strings.push(`Need ${state.needTxCount - state.doneTxCount}`)
     }
 
-    strings.push(`Left ${minutes}:${seconds}`)
+    // strings.push(`Left ${minutes}:${seconds}`)
 
     return await ctx.reply(strings.join('\n'))
 })
