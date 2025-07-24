@@ -402,7 +402,7 @@ telegram_app.command('tournament', async (ctx) => {
     const state = await getTournamentEndState();
     const isTournamentSafe = state.doneTxCount >= state.needTxCount;
 
-    const tournamentStateText = !isTournamentSafe ? "⛔️ Tournament may ends now!" : "✅ Tournament is safe.";
+    const tournamentStateText = !isTournamentSafe ? "⛔️ The tournament is almost over!" : "✅ Tournament is safe.";
     const ms = state.timeTo
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -693,7 +693,7 @@ cron.schedule(cronExpr, async () => {
     const totalSeconds = Math.ceil(ms / 1000);
     const minutes = Math.ceil(totalSeconds / 60);
 
-    const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
+    const text = `❌ The tournament is almost over.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
     const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';    
     if (state.doneTxCount < state.needTxCount) {
         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
