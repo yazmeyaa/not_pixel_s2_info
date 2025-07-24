@@ -692,9 +692,9 @@ cron.schedule(cronExpr, async () => {
     const minutes = Math.floor(totalSeconds / 60);
 
     const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
-    telegram_app.telegram.sendMessage(notificator_channel_id, text);
-
+    
     if (state.doneTxCount < state.needTxCount) {
+        await telegram_app.telegram.sendMessage(notificator_channel_id, text);
         await Promise.all(chats.map(chat => {
             return telegram_app.telegram.sendMessage(chat.chatId, text)
         }))
