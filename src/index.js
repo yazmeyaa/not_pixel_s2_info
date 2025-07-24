@@ -683,19 +683,21 @@ telegram_app.command('disable_notifications', (ctx) => {
 })
 
 const cronExpr = '50,55,59 * * * *'
+const notificator_channel_id = -1002846233625;
 cron.schedule(cronExpr, async () => {
     const state = await getTournamentEndState();
-    if (state.doneTxCount < state.needTxCount) {
-        const chats = getNotificationChats();
-        const ms = state.timeTo
-        const totalSeconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
+    const chats = getNotificationChats();
+    const ms = state.timeTo
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
 
-        const promises = chats.map(chat => {
-            const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
+    const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
+    telegram_app.telegram.sendMessage(notificator_channel_id, text);
+
+    if (state.doneTxCount < state.needTxCount) {
+        await Promise.all(chats.map(chat => {
             return telegram_app.telegram.sendMessage(chat.chatId, text)
-        })
-        Promise.all(promises)
+        }))
     }
 })
 
