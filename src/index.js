@@ -226,7 +226,9 @@ Available commands:
 /pixels_stats – View available pixels by price tiers.
 /tournament - Get information about torunament end
 /enable_notifications - Enable notifications anout near tournament end. Notifications will be sent 10, 5 and 1 minute before the end of the tournament. Notifications will only be sent if the tournament extension conditions have not been met.
-/disable_notifications - Disable notifications about tournament end.`;
+/disable_notifications - Disable notifications about tournament end.
+
+Channel with tournament alerts @not_pixel_final`;
 
     ctx.reply(text);
 })
@@ -691,7 +693,7 @@ cron.schedule(cronExpr, async () => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
 
-    const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
+    const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!\n\nNotifications arrive fastest in the @not_pixel_final channel`
     
     if (state.doneTxCount < state.needTxCount) {
         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
