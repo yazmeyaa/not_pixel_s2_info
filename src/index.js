@@ -693,12 +693,12 @@ cron.schedule(cronExpr, async () => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
 
-    const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!\n\nNotifications arrive fastest in the @not_pixel_final channel`
-    
+    const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
+    const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';    
     if (state.doneTxCount < state.needTxCount) {
         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
         await Promise.all(chats.map(chat => {
-            return telegram_app.telegram.sendMessage(chat.chatId, text)
+            return telegram_app.telegram.sendMessage(chat.chatId, text.concat(notificator_substr))
         }))
     }
 })
