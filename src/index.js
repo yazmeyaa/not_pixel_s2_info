@@ -698,7 +698,9 @@ cron.schedule(cronExpr, async () => {
     if (state.doneTxCount < state.needTxCount) {
         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
         await Promise.all(chats.map(chat => {
-            return telegram_app.telegram.sendMessage(chat.chatId, text.concat(notificator_substr))
+            const promise = telegram_app.telegram.sendMessage(chat.chatId, text.concat(notificator_substr));
+            promise.catch(console.error);
+            return promise;
         }))
     }
 })
