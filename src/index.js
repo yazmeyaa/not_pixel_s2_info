@@ -690,8 +690,8 @@ cron.schedule(cronExpr, async () => {
     const state = await getTournamentEndState();
     const chats = getNotificationChats();
     const ms = state.timeTo
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
+    const totalSeconds = Math.ceil(ms / 1000);
+    const minutes = Math.ceil(totalSeconds / 60);
 
     const text = `❌ Tournament close to the end.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
     const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';    
