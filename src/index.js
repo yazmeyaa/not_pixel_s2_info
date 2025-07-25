@@ -690,10 +690,10 @@ cron.schedule(cronExpr, async () => {
     const state = await getTournamentEndState();
     const chats = getNotificationChats();
     const ms = state.timeTo
-    const totalSeconds = Math.ceil(ms / 1000);
-    const minutes = Math.ceil(totalSeconds / 60);
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
 
-    const text = `❌ The tournament is almost over.\nLeft only ${minutes} minutes and ${state.needTxCount - state.doneTxCount} transactions!`
+    const text = `❌ The tournament is almost over.\nLeft only ${minutes}m ${totalSeconds}s and ${state.needTxCount - state.doneTxCount} transactions!`
     const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';    
     if (state.doneTxCount < state.needTxCount) {
         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
