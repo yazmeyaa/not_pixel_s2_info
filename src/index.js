@@ -684,19 +684,51 @@ telegram_app.command('disable_notifications', (ctx) => {
     ctx.reply('Notifications disabled for this chat.')
 })
 
+let processingStarted = false;
+
+const startProcessingFinal = (chats, next = true) => {
+    if (processingStarted) return;
+    processingStarted = true;
+
+    const loop = async () => {
+        const state = await getTournamentEndState();
+
+        if (state.doneTxCount >= state.needTxCount) {
+            next = false;
+            const text = `✅ Tournament is safe now.`;
+            const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
+
+            await telegram_app.telegram.sendMessage(notificator_channel_id, text);
+            await Promise.all(chats.map(chat => {
+                const promise = telegram_app.telegram.sendMessage(chat.chatId, text + notificator_substr);
+                promise.catch(console.error);
+                return promise;
+            }));
+
+            processingStarted = false;
+            return;
+        }
+
+        setTimeout(loop, 5000);
+    };
+
+    loop();
+}
+
 const cronExpr = '50,55,59 * * * *'
 const notificator_channel_id = -1002846233625;
 cron.schedule(cronExpr, async () => {
     const state = await getTournamentEndState();
     const chats = getNotificationChats();
-    const ms = state.timeTo
+    const ms = state.timeTo;
     const totalSeconds = Math.floor(ms / 1000);
     const seconds = totalSeconds % 60;
     const minutes = Math.floor(totalSeconds / 60);
 
     const text = `❌ The tournament is almost over.\nLeft only ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s and ${state.needTxCount - state.doneTxCount} transactions!\n${state.doneTxCount}/${state.needTxCount} transactions done.`
     const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
-    if (state.doneTxCount < state.needTxCount) {
+
+    if ((state.doneTxCount < state.needTxCount) && minutes <= 15) {
         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
         await Promise.all(chats.map(chat => {
             const promise = telegram_app.telegram.sendMessage(chat.chatId, text.concat(notificator_substr));
@@ -704,6 +736,7 @@ cron.schedule(cronExpr, async () => {
             return promise;
         }))
     }
+    startProcessingFinal(chats);
 })
 
 setInterval(async () => {
