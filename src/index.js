@@ -728,15 +728,16 @@ cron.schedule(cronExpr, async () => {
     const text = `❌ The tournament is almost over.\nLeft only ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s and ${state.needTxCount - state.doneTxCount} transactions!\n${state.doneTxCount}/${state.needTxCount} transactions done.`
     const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
 
-    if ((state.doneTxCount < state.needTxCount) && minutes <= 15) {
+    if ((state.doneTxCount < state.needTxCount) && minutes <= 30) {
         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
         await Promise.all(chats.map(chat => {
             const promise = telegram_app.telegram.sendMessage(chat.chatId, text.concat(notificator_substr));
             promise.catch(console.error);
             return promise;
         }))
+
+        startProcessingFinal(chats);
     }
-    startProcessingFinal(chats);
 })
 
 setInterval(async () => {
