@@ -686,37 +686,47 @@ telegram_app.command('disable_notifications', (ctx) => {
 
 let processingStarted = false;
 
-const startProcessingFinal = (chats, next = true) => {
+const startProcessingFinal = (chats) => {
     if (processingStarted) return;
     processingStarted = true;
+
+    /**@type {NodeJS.Timeout} */
+    let t;
 
     const loop = async () => {
         const state = await getTournamentEndState();
 
         if (state.doneTxCount >= state.needTxCount) {
-            next = false;
             const text = `✅ Tournament is safe now.`;
             const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
 
-            await telegram_app.telegram.sendMessage(notificator_channel_id, text);
+            try {
+                await telegram_app.telegram.sendMessage(notificator_channel_id, text);
+            } catch (error) {
+                console.error(error)
+            }
+
             await Promise.all(chats.map(chat => {
                 const promise = telegram_app.telegram.sendMessage(chat.chatId, text + notificator_substr);
                 promise.catch(console.error);
                 return promise;
             }));
 
+            clearTimeout(t);
             processingStarted = false;
             return;
-        }
 
-        setTimeout(loop, 5000);
+        }
+        console.log(3)
+
+        t = setTimeout(loop, 2000);
     };
 
     loop();
 }
 
 const cronExpr = '50,55,59 * * * *'
-const notificator_channel_id = -1002846233625;
+const notificator_channel_id = -1002773366662;
 cron.schedule(cronExpr, async () => {
     const state = await getTournamentEndState();
     const chats = getNotificationChats();
@@ -728,7 +738,7 @@ cron.schedule(cronExpr, async () => {
     const text = `❌ The tournament is almost over.\nLeft only ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s and ${state.needTxCount - state.doneTxCount} transactions!\n${state.doneTxCount}/${state.needTxCount} transactions done.`
     const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
 
-    if ((state.doneTxCount < state.needTxCount) && minutes <= 30) {
+    if (state.doneTxCount < state.needTxCount) {
         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
         await Promise.all(chats.map(chat => {
             const promise = telegram_app.telegram.sendMessage(chat.chatId, text.concat(notificator_substr));
@@ -739,6 +749,8 @@ cron.schedule(cronExpr, async () => {
         startProcessingFinal(chats);
     }
 })
+
+telegram_app.on('channel_post', (ctx) => console.log(ctx.chat));
 
 setInterval(async () => {
     const pixels = await getAvailablePixelsCountNoCache()
