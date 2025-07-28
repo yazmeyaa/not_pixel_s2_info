@@ -708,7 +708,12 @@ const startProcessingFinal = (chats) => {
 
             await Promise.all(chats.map(chat => {
                 const promise = telegram_app.telegram.sendMessage(chat.chatId, text + notificator_substr);
-                promise.catch(console.error);
+                promise.catch((error) => {
+                    console.error(error);
+                    if ('response' in error && 'error_code' in error.response && error.response.error_code === 403) {
+                        removeNotificationReciever(chat.chatId);
+                    }
+                });
                 return promise;
             }));
 
@@ -740,7 +745,12 @@ cron.schedule(cronExpr, async () => {
         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
         await Promise.all(chats.map(chat => {
             const promise = telegram_app.telegram.sendMessage(chat.chatId, text.concat(notificator_substr));
-            promise.catch(console.error);
+            promise.catch((error) => {
+                console.error(error);
+                if ('response' in error && 'error_code' in error.response && error.response.error_code === 403) {
+                    removeNotificationReciever(chat.chatId);
+                }
+            });
             return promise;
         }))
 
