@@ -758,8 +758,6 @@ cron.schedule(cronExpr, async () => {
     }
 })
 
-telegram_app.on('channel_post', (ctx) => console.log(ctx.chat));
-
 setInterval(async () => {
     const pixels = await getAvailablePixelsCountNoCache()
     globalThis.pixelsCount.prev = globalThis.pixelsCount.current;
