@@ -717,8 +717,6 @@ const startProcessingFinal = (chats) => {
             return;
 
         }
-        console.log(3)
-
         t = setTimeout(loop, 2000);
     };
 
