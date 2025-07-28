@@ -733,7 +733,7 @@ cron.schedule(cronExpr, async () => {
     const seconds = totalSeconds % 60;
     const minutes = Math.floor(totalSeconds / 60);
 
-    const text = `❌ The tournament is almost over.\nLeft only ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s and ${state.needTxCount - state.doneTxCount} transactions!\n${state.doneTxCount}/${state.needTxCount} transactions done.`
+    const text = `⚠️ The tournament is almost over.\nLeft only ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s and ${state.needTxCount - state.doneTxCount} transactions!\n${state.doneTxCount}/${state.needTxCount} transactions done.`
     const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
 
     if (state.doneTxCount < state.needTxCount) {
