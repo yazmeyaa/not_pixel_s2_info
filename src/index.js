@@ -684,6 +684,27 @@ telegram_app.command('disable_notifications', (ctx) => {
     ctx.reply('Notifications disabled for this chat.')
 })
 
+const sendNotificationToChannel = async (text) => {
+    try {
+        await telegram_app.telegram.sendMessage(notificator_channel_id, text);
+    } catch (error) {
+        console.error(error)
+    }
+}
+
+const fireNotifications = async (chats, notificationText) => {
+    await Promise.all(chats.map(chat => {
+        const promise = telegram_app.telegram.sendMessage(chat.chatId, notificationText);
+        promise.catch((error) => {
+            console.error(error);
+            if ('response' in error && 'error_code' in error.response && error.response.error_code === 403) {
+                removeNotificationReciever(chat.chatId);
+            }
+        });
+        return promise;
+    }));
+}
+
 let processingStarted = false;
 
 const startProcessingFinal = (chats) => {
@@ -700,22 +721,8 @@ const startProcessingFinal = (chats) => {
             const text = `✅ Tournament is safe now.`;
             const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
 
-            try {
-                await telegram_app.telegram.sendMessage(notificator_channel_id, text);
-            } catch (error) {
-                console.error(error)
-            }
-
-            await Promise.all(chats.map(chat => {
-                const promise = telegram_app.telegram.sendMessage(chat.chatId, text + notificator_substr);
-                promise.catch((error) => {
-                    console.error(error);
-                    if ('response' in error && 'error_code' in error.response && error.response.error_code === 403) {
-                        removeNotificationReciever(chat.chatId);
-                    }
-                });
-                return promise;
-            }));
+            await sendNotificationToChannel(text);
+            await fireNotifications(chats, text + notificator_substr);
 
             clearTimeout(t);
             processingStarted = false;
@@ -742,18 +749,8 @@ cron.schedule(cronExpr, async () => {
     const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
 
     if (state.doneTxCount < state.needTxCount) {
-        await telegram_app.telegram.sendMessage(notificator_channel_id, text);
-        await Promise.all(chats.map(chat => {
-            const promise = telegram_app.telegram.sendMessage(chat.chatId, text.concat(notificator_substr));
-            promise.catch((error) => {
-                console.error(error);
-                if ('response' in error && 'error_code' in error.response && error.response.error_code === 403) {
-                    removeNotificationReciever(chat.chatId);
-                }
-            });
-            return promise;
-        }))
-
+        await sendNotificationToChannel(text);
+        await fireNotifications(chats, text + notificator_substr);
         startProcessingFinal(chats);
     }
 })
