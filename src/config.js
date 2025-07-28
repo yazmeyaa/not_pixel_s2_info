@@ -24,7 +24,8 @@ export const appConfig = {
         rpsLimit: parseInt(getEnv("TONAPI_RPS", false, "10"))
     },
     telegram: {
-        botToken: getEnv("BOT_TOKEN")
+        botToken: getEnv("BOT_TOKEN"),
+        telegramChannelChatID: getEnv("TELEGRAM_NOTIFICATION_CHANNEL_CHAT_ID", true)
     },
     jsonBin: {
         accessKey: getEnv("JSONBIN_ACCESS_KEY")

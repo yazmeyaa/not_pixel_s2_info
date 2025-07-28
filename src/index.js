@@ -724,7 +724,7 @@ const startProcessingFinal = (chats) => {
 }
 
 const cronExpr = '50,55,59 * * * *'
-const notificator_channel_id = -1002846233625;
+const notificator_channel_id = appConfig.telegram.telegramChannelChatID;
 cron.schedule(cronExpr, async () => {
     const state = await getTournamentEndState();
     const chats = getNotificationChats();
