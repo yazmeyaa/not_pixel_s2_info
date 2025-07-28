@@ -724,7 +724,7 @@ const startProcessingFinal = (chats) => {
 }
 
 const cronExpr = '50,55,59 * * * *'
-const notificator_channel_id = -1002773366662;
+const notificator_channel_id = -1002846233625;
 cron.schedule(cronExpr, async () => {
     const state = await getTournamentEndState();
     const chats = getNotificationChats();
