@@ -685,28 +685,28 @@ telegram_app.command('disable_notifications', (ctx) => {
     ctx.reply('Notifications disabled for this chat.')
 })
 
-const sendNotificationToChannel = async (text) => {
-    try {
-        await telegram_app.telegram.sendMessage(notificator_channel_id, text);
-    } catch (error) {
-        console.error(error)
-    }
-}
+// const sendNotificationToChannel = async (text) => {
+//     try {
+//         await telegram_app.telegram.sendMessage(notificator_channel_id, text);
+//     } catch (error) {
+//         console.error(error)
+//     }
+// }
 
-const fireNotifications = async (chats, notificationText) => {
-    await Promise.all(chats.map(chat => {
-        const promise = telegram_app.telegram.sendMessage(chat.chatId, notificationText);
-        promise.catch((error) => {
-            console.error(error);
-            if ('response' in error && 'error_code' in error.response && error.response.error_code === 403) {
-                removeNotificationReciever(chat.chatId);
-            }
-        });
-        return promise;
-    }));
-}
+// const fireNotifications = async (chats, notificationText) => {
+//     await Promise.all(chats.map(chat => {
+//         const promise = telegram_app.telegram.sendMessage(chat.chatId, notificationText);
+//         promise.catch((error) => {
+//             console.error(error);
+//             if ('response' in error && 'error_code' in error.response && error.response.error_code === 403) {
+//                 removeNotificationReciever(chat.chatId);
+//             }
+//         });
+//         return promise;
+//     }));
+// }
 
-let processingStarted = false;
+// let processingStarted = false;
 
 // const startProcessingFinal = (chats) => {
 //     if (processingStarted) return;
@@ -756,21 +756,21 @@ let processingStarted = false;
 //     }
 // })
 
-telegram_app.command("send_notifications_to_subscribers", async () => {
-    const ppls = getNotificationChats();
-    const text = `Since the tournament has ended, you are automatically unsubscribed from notifications.
-All your data will be deleted from the database.
-Thank you for participating in the tournament and see you in Season 3 (if you play, of course).`
-    await Promise.all(ppls.map(async (id) => {
-        try {
-            await telegram_app.telegram.sendMessage(id, text);
-        } catch (e) {
-            console.error(`Failed to send to ${id}:`, e);
-        }
-    }));
+// telegram_app.command("send_notifications_to_subscribers", async () => {
+//     const ppls = getNotificationChats();
+//     const text = `Since the tournament has ended, you are automatically unsubscribed from notifications.
+// All your data will be deleted from the database.
+// Thank you for participating in the tournament and see you in Season 3 (if you play, of course).`
+//     await Promise.all(ppls.map(async (id) => {
+//         try {
+//             await telegram_app.telegram.sendMessage(id, text);
+//         } catch (e) {
+//             console.error(`Failed to send to ${id}:`, e);
+//         }
+//     }));
 
 
-})
+// })
 
 setInterval(async () => {
     const pixels = await getAvailablePixelsCountNoCache()
