@@ -10,7 +10,7 @@ import { tonApiClient } from './tonapi.js'
 import { appConfig } from './config.js';
 import { getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats } from './api.js'
 // import cron from 'node-cron';
-import { addNotificationReciever,  removeNotificationReciever } from './notifications.js';
+import { addNotificationReciever, removeNotificationReciever } from './notifications.js';
 
 
 // --- Global Error Handling ---
@@ -764,7 +764,7 @@ setInterval(async () => {
     globalThis.pixelsCount.prev = globalThis.pixelsCount.current;
     globalThis.pixelsCount.current = pixels.pixels;
     globalThis.pixelsCount.uploadetAt = pixels.uploadetAt;
-}, 1000 * 60 * 30)
+}, 1000 * 60 * 30);
 
 // --- Metrics Polling ---
 // setInterval(() => catchError('metrics-collector', async () => {
