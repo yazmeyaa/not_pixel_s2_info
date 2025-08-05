@@ -756,6 +756,18 @@ let processingStarted = false;
 //     }
 // })
 
+telegram_app.command("send_notifications_to_subscribers", async () => {
+    const ppls = getNotificationChats();
+    const text = `Since the tournament has ended, you are automatically unsubscribed from notifications.
+All your data will be deleted from the database.
+Thank you for participating in the tournament and see you in Season 3 (if you play, of course).`
+    await Promise.all(ppls.map((id) => {
+        const promise = telegram_app.telegram.sendMessage(id, text)
+        promise.catch(console.error)
+        return promise;
+    }))
+})
+
 setInterval(async () => {
     const pixels = await getAvailablePixelsCountNoCache()
     globalThis.pixelsCount.prev = globalThis.pixelsCount.current;
