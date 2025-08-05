@@ -399,27 +399,28 @@ telegram_app.command('add_access', withAccessMiddleware('access_management'), as
 })
 
 telegram_app.command('tournament', async (ctx) => {
-    const state = await getTournamentEndState();
-    const isTournamentSafe = state.doneTxCount >= state.needTxCount;
+    // const state = await getTournamentEndState();
+    // const isTournamentSafe = state.doneTxCount >= state.needTxCount;
 
-    const tournamentStateText = !isTournamentSafe ? "⛔️ The tournament is almost over!" : "✅ Tournament is safe.";
-    const ms = state.timeTo
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const strings = [
-        tournamentStateText,
-        '',
-        `Transactions: ${state.doneTxCount} / ${state.needTxCount}`,
-    ];
+    // const tournamentStateText = !isTournamentSafe ? "⛔️ The tournament is almost over!" : "✅ Tournament is safe.";
+    // const ms = state.timeTo
+    // const totalSeconds = Math.floor(ms / 1000);
+    // const minutes = Math.floor(totalSeconds / 60);
+    // const seconds = totalSeconds % 60;
+    // const strings = [
+    //     tournamentStateText,
+    //     '',
+    //     `Transactions: ${state.doneTxCount} / ${state.needTxCount}`,
+    // ];
 
-    if (!isTournamentSafe) {
-        strings.push(`Need ${state.needTxCount - state.doneTxCount}`)
-    }
+    // if (!isTournamentSafe) {
+    //     strings.push(`Need ${state.needTxCount - state.doneTxCount}`)
+    // }
 
-    strings.push(`Left ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`)
+    // strings.push(`Left ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`)
 
-    return await ctx.reply(strings.join('\n'))
+    // return await ctx.reply(strings.join('\n'))
+    await ctx.reply("The tournament was ended!")
 })
 
 telegram_app.command('snipe', withAccessMiddleware('snipe'), async (ctx) => {
@@ -707,53 +708,53 @@ const fireNotifications = async (chats, notificationText) => {
 
 let processingStarted = false;
 
-const startProcessingFinal = (chats) => {
-    if (processingStarted) return;
-    processingStarted = true;
+// const startProcessingFinal = (chats) => {
+//     if (processingStarted) return;
+//     processingStarted = true;
 
-    /**@type {NodeJS.Timeout} */
-    let t;
+//     /**@type {NodeJS.Timeout} */
+//     let t;
 
-    const loop = async () => {
-        const state = await getTournamentEndState();
+//     const loop = async () => {
+//         const state = await getTournamentEndState();
 
-        if (state.doneTxCount >= state.needTxCount) {
-            const text = `✅ Tournament is safe now.`;
-            const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
+//         if (state.doneTxCount >= state.needTxCount) {
+//             const text = `✅ Tournament is safe now.`;
+//             const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
 
-            await sendNotificationToChannel(text);
-            await fireNotifications(chats, text + notificator_substr);
+//             await sendNotificationToChannel(text);
+//             await fireNotifications(chats, text + notificator_substr);
 
-            clearTimeout(t);
-            processingStarted = false;
-            return;
+//             clearTimeout(t);
+//             processingStarted = false;
+//             return;
 
-        }
-        t = setTimeout(loop, 2000);
-    };
+//         }
+//         t = setTimeout(loop, 2000);
+//     };
 
-    loop();
-}
+//     loop();
+// }
 
-const cronExpr = '50,55,59 * * * *'
-const notificator_channel_id = appConfig.telegram.telegramChannelChatID;
-cron.schedule(cronExpr, async () => {
-    const state = await getTournamentEndState();
-    const chats = getNotificationChats();
-    const ms = state.timeTo;
-    const totalSeconds = Math.floor(ms / 1000);
-    const seconds = totalSeconds % 60;
-    const minutes = Math.floor(totalSeconds / 60);
+// const cronExpr = '50,55,59 * * * *'
+// const notificator_channel_id = appConfig.telegram.telegramChannelChatID;
+// cron.schedule(cronExpr, async () => {
+//     const state = await getTournamentEndState();
+//     const chats = getNotificationChats();
+//     const ms = state.timeTo;
+//     const totalSeconds = Math.floor(ms / 1000);
+//     const seconds = totalSeconds % 60;
+//     const minutes = Math.floor(totalSeconds / 60);
 
-    const text = `⚠️ The tournament is almost over.\nLeft only ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s and ${state.needTxCount - state.doneTxCount} transactions!\n${state.doneTxCount}/${state.needTxCount} transactions done.`
-    const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
+//     const text = `⚠️ The tournament is almost over.\nLeft only ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s and ${state.needTxCount - state.doneTxCount} transactions!\n${state.doneTxCount}/${state.needTxCount} transactions done.`
+//     const notificator_substr = '\n\nNotifications arrive fastest in the @not_pixel_final channel';
 
-    if (state.doneTxCount < state.needTxCount) {
-        await sendNotificationToChannel(text);
-        await fireNotifications(chats, text + notificator_substr);
-        startProcessingFinal(chats);
-    }
-})
+//     if (state.doneTxCount < state.needTxCount) {
+//         await sendNotificationToChannel(text);
+//         await fireNotifications(chats, text + notificator_substr);
+//         startProcessingFinal(chats);
+//     }
+// })
 
 setInterval(async () => {
     const pixels = await getAvailablePixelsCountNoCache()
