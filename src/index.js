@@ -8,9 +8,9 @@ import { addUser, addUserAccess, checkAccess, getUserByTelegramID, User } from '
 import rateLimit from 'telegraf-ratelimit'
 import { tonApiClient } from './tonapi.js'
 import { appConfig } from './config.js';
-import { getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats, getTournamentEndState } from './api.js'
-import cron from 'node-cron';
-import { addNotificationReciever, getNotificationChats, removeNotificationReciever } from './notifications.js';
+import { getAvailablePixelsCountNoCache, getBankInfo, getOnlineUsers, getTokenStats } from './api.js'
+// import cron from 'node-cron';
+import { addNotificationReciever,  removeNotificationReciever } from './notifications.js';
 
 
 // --- Global Error Handling ---
@@ -118,17 +118,17 @@ class Metric {
 }
 const insertStmt = db.prepare('INSERT INTO metrics (current_online, bank_reward, ts) VALUES(@currentOnline, @bankReward, @timestamp)');
 const selectStmt = db.prepare('SELECT current_online, bank_reward, ts FROM metrics WHERE ts BETWEEN @start AND @end');
-function saveMetrics(currentOnline, bankReward) {
-    try {
-        insertStmt.run({
-            currentOnline,
-            bankReward,
-            timestamp: Date.now(),
-        });
-    } catch (err) {
-        logError('db:insert', err);
-    }
-}
+// function saveMetrics(currentOnline, bankReward) {
+//     try {
+//         insertStmt.run({
+//             currentOnline,
+//             bankReward,
+//             timestamp: Date.now(),
+//         });
+//     } catch (err) {
+//         logError('db:insert', err);
+//     }
+// }
 function getMetrics(from, to) {
     const rows = selectStmt.all({ start: from.getTime(), end: to.getTime() });
     return rows.map(row => new Metric(row.current_online, row.bank_reward, row.minted_pixels, row.ts));
@@ -235,29 +235,30 @@ Channel with tournament alerts @not_pixel_final`;
 
 
 telegram_app.command('pixels_stats', async (ctx) => {
-    const currentPixels = globalThis.pixelsCount.current;
-    if (!currentPixels) return;
-    const prev = globalThis.pixelsCount.prev;
+    // const currentPixels = globalThis.pixelsCount.current;
+    // if (!currentPixels) return;
+    // const prev = globalThis.pixelsCount.prev;
 
-    const availablePixelsText = Object.entries(currentPixels).map(([key, value]) => {
-        const txt = `${key} $PX ~${value} pcs.`;
-        if (prev !== null) {
-            const delta = currentPixels[key] - prev[key];
-            const deltaText = `[${delta > 0 ? `+${delta}` : delta}]`
-            return [txt, deltaText].join(' ')
-        }
+    // const availablePixelsText = Object.entries(currentPixels).map(([key, value]) => {
+    //     const txt = `${key} $PX ~${value} pcs.`;
+    //     if (prev !== null) {
+    //         const delta = currentPixels[key] - prev[key];
+    //         const deltaText = `[${delta > 0 ? `+${delta}` : delta}]`
+    //         return [txt, deltaText].join(' ')
+    //     }
 
-        return txt;
-    }).join('\n');
+    //     return txt;
+    // }).join('\n');
 
     await Promise.all([
         ctx.react('👍'),
-        ctx.reply([
-            "Available pixels:\n",
-            availablePixelsText,
-            '',
-            `Updated at: ${globalThis.pixelsCount.uploadetAt.toUTCString()}`
-        ].join('\n'))
+        ctx.reply("The tournament was ended!")
+        // ctx.reply([
+        //     "Available pixels:\n",
+        //     availablePixelsText,
+        //     '',
+        //     `Updated at: ${globalThis.pixelsCount.uploadetAt.toUTCString()}`
+        // ].join('\n'))
     ]);
 });
 
@@ -268,26 +269,12 @@ telegram_app.command('info', ctx => catchError('tg:info', async () => {
         getOnlineUsers(),
         getTokenStats(),
     ]);
-
-    const deltas = [
-        { label: '10m', result: getDelta(10 * 60 * 1000, bankInfo) },
-        { label: '30m', result: getDelta(30 * 60 * 1000, bankInfo) },
-        { label: '1h', result: getDelta(60 * 60 * 1000, bankInfo) },
-    ];
-
-    const deltaLines = deltas.map(({ label, result }) => {
-        if (!result) return `↔️ No data for ${label}`;
-        const arrow = result.delta > 0 ? '📈' : result.delta < 0 ? '📉' : '➖';
-        return `${arrow} ${label}: ${result.delta.toLocaleString('en-US')} PX (${result.percent.toFixed(2)}%)`;
-    });
-
     const toBurn = ((bankInfo - 1_000_000) / 2);
 
     await ctx.react('👍');
     await ctx.reply([
         `💵 Price PX/USDT: $${tokenStats.price.toFixed(3)}`,
         `💰 Tournament Bank: ${bankInfo.toLocaleString('en-US')} $PX (~${(bankInfo * tokenStats.price).toLocaleString('en-US')}$)`,
-        `📊 Bank change:\n${deltaLines.join('\n')}\n`,
         `🔥 Pixels to burn ${toBurn.toLocaleString('en-US')} $PX🔥`,
         `🟢 Online users: ${currentUsers.toLocaleString('en-US')}`
     ].join('\n'));
@@ -672,17 +659,17 @@ telegram_app.command('collect', withAccessMiddleware('snipe'), async (ctx) => {
 });
 
 telegram_app.command('enable_notifications', async (ctx) => {
-    const chatId = ctx.chat.id
-    addNotificationReciever(chatId);
+    // const chatId = ctx.chat.id
+    // addNotificationReciever(chatId);
     ctx.react('👍')
-    ctx.reply('Notifications enabled for this chat.')
+    ctx.reply('The tournament was ended!')
 })
 
 telegram_app.command('disable_notifications', (ctx) => {
-    const chatId = ctx.chat.id
-    removeNotificationReciever(chatId)
+    // const chatId = ctx.chat.id
+    // removeNotificationReciever(chatId)
     ctx.react('👍')
-    ctx.reply('Notifications disabled for this chat.')
+    ctx.reply('The tournament was ended!')
 })
 
 // const sendNotificationToChannel = async (text) => {
@@ -780,32 +767,32 @@ setInterval(async () => {
 }, 1000 * 60 * 30)
 
 // --- Metrics Polling ---
-setInterval(() => catchError('metrics-collector', async () => {
-    const [bankInfo, currentUsers] = await Promise.all([getBankInfo(), getOnlineUsers()]);
-    saveMetrics(currentUsers, bankInfo);
-    const metrics = getMetrics(new Date(Date.now() - getHours(24)), new Date());
-    await renderMetricsCharts(metrics);
-}), getMinutes(5));
+// setInterval(() => catchError('metrics-collector', async () => {
+//     const [bankInfo, currentUsers] = await Promise.all([getBankInfo(), getOnlineUsers()]);
+//     saveMetrics(currentUsers, bankInfo);
+//     const metrics = getMetrics(new Date(Date.now() - getHours(24)), new Date());
+//     await renderMetricsCharts(metrics);
+// }), getMinutes(5));
 
-setInterval(async () => {
-    const bankInfo = await getBankInfo()
-    updateSnapshots(bankInfo);
-}, getSeconds(10));
+// setInterval(async () => {
+//     const bankInfo = await getBankInfo()
+//     updateSnapshots(bankInfo);
+// }, getSeconds(10));
 
 // --- Startup ---
 (async () => {
     await catchError('startup', async () => {
-        try {
-            const pixels = await getAvailablePixelsCountNoCache();
-            globalThis.pixelsCount.current = pixels.pixels;
-            globalThis.pixelsCount.uploadetAt = pixels.uploadetAt;
-        }
-        catch (error) {
-            console.error(error)
-        }
+        // try {
+        //     const pixels = await getAvailablePixelsCountNoCache();
+        //     globalThis.pixelsCount.current = pixels.pixels;
+        //     globalThis.pixelsCount.uploadetAt = pixels.uploadetAt;
+        // }
+        // catch (error) {
+        //     console.error(error)
+        // }
 
-        const bankInfo = await getBankInfo()
-        updateSnapshots(bankInfo);
+        // const bankInfo = await getBankInfo()
+        // updateSnapshots(bankInfo);
 
         const metrics = getMetrics(new Date(Date.now() - getHours(24)), new Date());
         await renderMetricsCharts(metrics);
